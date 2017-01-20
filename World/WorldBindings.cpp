@@ -27,6 +27,7 @@
 #include "PlanetarySystem.h"
 #include "Race.h"
 #include "Asteroid.h"
+#include "Planet.h"
 
 namespace OpenSR
 {
@@ -107,6 +108,7 @@ WorldJSFactory::WorldJSFactory(QObject *parent): QObject(parent)
 WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldJSFactory, RaceStyle)
 WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldJSFactory, PlanetarySystemStyle)
 WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldJSFactory, AsteroidStyle)
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldJSFactory, PlanetStyle)
 
 WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldJSFactory, Race)
 WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldJSFactory, Item)

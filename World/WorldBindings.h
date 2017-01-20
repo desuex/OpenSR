@@ -24,6 +24,7 @@
 #include "PlanetarySystem.h"
 #include "Race.h"
 #include "Asteroid.h"
+#include "Planet.h"
 
 class QJSEngine;
 class QQmlEngine;
@@ -58,6 +59,7 @@ public:
     WORLD_DECLARE_JS_GADGET_CONSTRUCTOR(RaceStyle)
     WORLD_DECLARE_JS_GADGET_CONSTRUCTOR(PlanetarySystemStyle)
     WORLD_DECLARE_JS_GADGET_CONSTRUCTOR(AsteroidStyle)
+    WORLD_DECLARE_JS_GADGET_CONSTRUCTOR(PlanetStyle)
 
     WORLD_DECLARE_JS_OBJECT_CONSTRUCTOR(Race)
     WORLD_DECLARE_JS_OBJECT_CONSTRUCTOR(Item)
