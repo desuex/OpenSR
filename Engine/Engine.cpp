@@ -74,7 +74,7 @@ Engine::Engine(int& argc, char** argv): QApplication(argc, argv)
 
     m_qmlEngine->setNetworkAccessManagerFactory(m_resources->qmlNAMFactory());
 
-    m_scriptEngine = new QJSEngine(this);
+    m_scriptEngine = new QQmlEngine(this);
     m_scriptEngine->installExtensions(QJSEngine::AllExtensions);
     m_scriptEngine->globalObject().setProperty("engine", m_scriptEngine->newQObject(this));
 }
