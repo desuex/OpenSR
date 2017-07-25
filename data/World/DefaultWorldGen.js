@@ -80,7 +80,6 @@ for(var k in asteroidStyles)
 
 var planet = World.InhabitedPlanet(system);
 planet.name = "PlanetName.Solar.2"
-//planet.name = "Earth";
 planet.style = World.PlanetStyle();
 planet.style.texture = "res:/DATA/Star/StarBlue.gai";
 planet.period = 15;
@@ -93,14 +92,14 @@ function initStation(obj, kind) {
     case "rangerCenter":
     case "rc":
         obj.StationKind = 1;
-        //obj.style = World.StationStyle();
+        obj.style = World.StationStyle();
         obj.style.texture = "res:/DATA/Ruins/RC.gai";
     }
 }
 
 var rangerCenter1 = World.SpaceStation(system);
-console.log("rangerCenter1.style = " + rangerCenter1.style);
 initStation(rangerCenter1, "ranger")
+//console.log("rangerCenter1.style = " + rangerCenter1.style);
 rangerCenter1.position = Qt.point(-111, -222);
 
 context.currentSystem = system;

@@ -30,6 +30,10 @@ const quint32 SpaceStation::m_staticTypeId = typeIdFromClassName(SpaceStation::s
 template<>
 void WorldObject::registerType<SpaceStation>()
 {
+    qRegisterMetaType<StationStyle>();
+    qRegisterMetaTypeStreamOperators<StationStyle>();
+    qRegisterMetaType<StationStyle::Data>();
+    qRegisterMetaTypeStreamOperators<StationStyle::Data>();
     // It will be great to be able to use the enum in the script but I don't know how
     // At the moment it works only in .qml files
     qRegisterMetaType<SpaceStation::StationKind>("StationKind");
