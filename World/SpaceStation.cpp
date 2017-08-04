@@ -59,7 +59,7 @@ const QMetaObject* WorldObject::staticTypeMeta<SpaceStation>()
 }
 
 SpaceStation::SpaceStation(WorldObject *parent, quint32 id): MannedObject(parent, id)
-  , m_StationKind(StationKind::Unspecified)
+  , m_StationKind(static_cast<int>(StationKind::Unspecified) )
 {
 }
 
@@ -77,7 +77,7 @@ QString SpaceStation::namePrefix() const
     return tr("Space station");
 }
 
-SpaceStation::StationKind SpaceStation::Kind() const
+int SpaceStation::Kind() const
 {
     return m_StationKind;
 }
@@ -87,7 +87,7 @@ StationStyle SpaceStation::style() const
     return m_style;
 }
 
-void SpaceStation::setStationKind(SpaceStation::StationKind kind)
+void SpaceStation::setStationKind(int kind)
 {
     if (m_StationKind == kind)
         return;
