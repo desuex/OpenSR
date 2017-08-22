@@ -21,9 +21,9 @@
 
 #include "WorldObject.h"
 
-#include <QJSEngine>
-#include <QMetaObject>
-#include <QQmlEngine>
+#include <QtCore/QMetaObject>
+#include <QtCore/QMetaEnum>
+#include <QtQml/QJSEngine>
 
 class QQmlEngine;
 

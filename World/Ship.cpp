@@ -17,8 +17,9 @@
 */
 
 #include "Ship.h"
+#include "WorldBindings.h"
 
-#include <QtQml>
+#include <QtQml/QQmlEngine>
 
 namespace OpenSR
 {
@@ -29,6 +30,11 @@ const quint32 Ship::m_staticTypeId = typeIdFromClassName(Ship::staticMetaObject.
 template<>
 void WorldObject::registerType<Ship>(QQmlEngine *qml, QJSEngine *script)
 {
+    qRegisterMetaType<ShipStyle>();
+    qRegisterMetaTypeStreamOperators<ShipStyle>();
+    qRegisterMetaType<ShipStyle::Data>();
+    qRegisterMetaTypeStreamOperators<ShipStyle::Data>();
+    bindEnumsToJS<Ship>(script);
     qmlRegisterType<Ship>("OpenSR.World", 1, 0, "Ship");
 }
 
@@ -50,6 +56,38 @@ const QMetaObject* WorldObject::staticTypeMeta<Ship>()
     return &Ship::staticMetaObject;
 }
 
+/**************************************************************************************************/
+
+int ShipStyle::width() const
+{
+    return getData<Data>().width;
+}
+
+void ShipStyle::setWidth(int w)
+{
+    auto d = getData<Data>();
+    d.width = w;
+    setData(d);
+}
+
+QString ShipStyle::texture() const
+{
+    return getData<Data>().texture;
+}
+
+void ShipStyle::setTexture(const QString &texture)
+{
+    auto d = getData<Data>();
+    d.texture = texture;
+    setData(d);
+}
+
+bool operator==(const ShipStyle& one, const ShipStyle& another)
+{
+    return one.texture() == another.texture();
+}
+
+/*  Ship */
 Ship::Ship(WorldObject *parent, quint32 id): MannedObject(parent, id)
 {
 }
@@ -67,5 +105,34 @@ QString Ship::namePrefix() const
 {
     return tr("Ship");
 }
+
+Ship::ShipAffiliation Ship::affiliation() const
+{
+    return m_affiliation;
+}
+
+Ship::ShipRank Ship::rank() const
+{
+    return m_rank;
+}
+
+void Ship::setAffiliation(Ship::ShipAffiliation affiliation)
+{
+    if (m_affiliation == affiliation)
+        return;
+
+    m_affiliation = affiliation;
+    emit affiliationChanged(m_affiliation);
+}
+
+void Ship::setRank(Ship::ShipRank rank)
+{
+    if (m_rank == rank)
+        return;
+
+    m_rank = rank;
+    emit rankChanged(m_rank);
+}
+
 }
 }

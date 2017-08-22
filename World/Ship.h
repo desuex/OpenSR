@@ -21,24 +21,86 @@
 
 #include "World.h"
 #include "MannedObject.h"
+#include "Resource.h"
 
 namespace OpenSR
 {
 namespace World
 {
+
+class OPENSR_WORLD_API ShipStyle: public Resource
+{
+    Q_GADGET
+    Q_PROPERTY(QString texture READ texture  WRITE setTexture)
+    Q_PROPERTY(int     width   READ width    WRITE setWidth)
+
+public:
+    struct Data {
+        QString texture;
+        int width;
+    };
+
+    int width() const;
+    void setWidth(int);
+    QString texture() const;
+    void setTexture(const QString& texture);
+};
+
+bool operator==(const ShipStyle& one, const ShipStyle& another);
+
+QDataStream& operator<<(QDataStream & stream, const ShipStyle& style);
+QDataStream& operator>>(QDataStream & stream, ShipStyle& style);
+QDataStream& operator<<(QDataStream & stream, const ShipStyle::Data& data);
+QDataStream& operator>>(QDataStream & stream, ShipStyle::Data& data);
+
 class OPENSR_WORLD_API Ship: public MannedObject
 {
     Q_OBJECT
     OPENSR_WORLD_OBJECT
 
+    Q_PROPERTY(ShipAffiliation affiliation READ affiliation WRITE setAffiliation NOTIFY affiliationChanged)
+    Q_PROPERTY(ShipRank        rank        READ rank        WRITE setRank        NOTIFY rankChanged)
+
 public:
+    enum class ShipAffiliation {
+        Unspecified = 0,
+        Gaal, Fei, People, Peleng, Malok,
+        Keller, Terron, Blazer,
+        UnknownRace
+    };
+    Q_ENUM(ShipAffiliation);
+
+    enum class ShipRank {
+        Unspecified = 0,
+        Diplomat, Liner, Ranger, Pirate, Warrior, Transport
+    };
+    Q_ENUM(ShipRank);
+
     Q_INVOKABLE Ship(WorldObject *parent = 0, quint32 id = 0);
     virtual ~Ship();
 
     virtual quint32 typeId() const;
     virtual QString namePrefix() const;
+    ShipAffiliation affiliation() const;
+
+    ShipRank rank() const;
+
+public slots:
+    void setAffiliation(ShipAffiliation affiliation);
+    void setRank(ShipRank rank);
+
+signals:
+    void affiliationChanged(ShipAffiliation affiliation);
+    void rankChanged(ShipRank rank);
+
+private:
+    ShipAffiliation m_affiliation;
+    ShipRank m_rank;
 };
 }
 }
+
+Q_DECLARE_METATYPE(OpenSR::World::ShipStyle)
+Q_DECLARE_METATYPE(OpenSR::World::ShipStyle::Data)
 
 #endif // OPENSR_WORLD_SHIP_H

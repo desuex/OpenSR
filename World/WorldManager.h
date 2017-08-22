@@ -34,6 +34,7 @@
 #include "Asteroid.h"
 #include "Planet.h"
 #include "SpaceStation.h"
+#include "Ship.h"
 
 namespace OpenSR
 {
@@ -97,6 +98,7 @@ public:
     Q_INVOKABLE bool loadWorld(const QString& path);
 
     // TODO: Move Constructors to Separate factory?
+    Q_INVOKABLE OpenSR::World::ShipStyle            newShipStyle();
     Q_INVOKABLE OpenSR::World::RaceStyle            newRaceStyle();
     Q_INVOKABLE OpenSR::World::PlanetarySystemStyle newPlanetarySystemStyle();
     Q_INVOKABLE OpenSR::World::AsteroidStyle        newAsteroidStyle();
