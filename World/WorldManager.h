@@ -132,6 +132,8 @@ public:
     Q_INVOKABLE OpenSR::World::Ship*                newShip(OpenSR::World::WorldObject *parent = 0);
     Q_INVOKABLE OpenSR::World::SpaceStation*        newSpaceStation(OpenSR::World::WorldObject *parent = 0);
 
+
+
 Q_SIGNALS:
     void contextChanged();
 

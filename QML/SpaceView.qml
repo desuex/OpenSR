@@ -11,11 +11,12 @@ Item {
     property int maxScrollTime: 600
 
     property var trajectoryView
+    property var playerTrajectoryView
 
     anchors.fill: parent
-    
+
     id: view
-    
+
     Rectangle {
         anchors.fill: parent
         color: "black"
@@ -77,6 +78,7 @@ Item {
         o.entered.connect(showDebugTooltip);
         o.exited.connect(hideDebugTooltip);
         for (var c in system.children) {
+            // TODO: don't show trajectory of player ship here
             o = component.createObject(spaceNode, {object: system.children[c]});
             o.entered.connect(showDebugTooltip);
             o.exited.connect(hideDebugTooltip);
@@ -85,6 +87,7 @@ Item {
         }
 
         var trajComponent = Qt.createComponent("TrajectoryItem.qml");
+//        console.log( system.children[0] );
         trajectoryView = trajComponent.createObject(spaceNode, {object: system.children[0], visible: false});
     }
 
@@ -94,6 +97,7 @@ Item {
     }
 
     function showTrajectory(object) {
+//        console.log("Show trajectory of ", JSON.stringify(object))
         trajectoryView.visibleRect = spaceNode.mapFromItem(view, 0, 0, view.width, view.height)
         if (trajectoryView.object !== object)
             trajectoryView.object = object;
@@ -314,5 +318,20 @@ Item {
         anchors.right: parent.right
         text: "Turn"
         onClicked: WorldManager.startTurn()
+    }
+
+    MouseArea {
+        id: spaceMouseOverlay
+        anchors.fill: parent
+        propagateComposedEvents: true
+        onClicked: {
+            if (mouse.button !== Qt.LeftButton)
+                return;
+
+            mouse.accepted = true;
+            console.log("left clicked in space")
+            //console.log(World.context.playerShip)
+            World.context.playerShip.evalTrajectoryTo( Qt.point(mouse.x, mouse.y) );
+        }
     }
 }

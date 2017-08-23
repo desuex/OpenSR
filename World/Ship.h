@@ -85,6 +85,8 @@ public:
 
     ShipRank rank() const;
 
+    Q_INVOKABLE void evalTrajectoryTo(const QPointF &dest);
+
 public slots:
     void setAffiliation(ShipAffiliation affiliation);
     void setRank(ShipRank rank);

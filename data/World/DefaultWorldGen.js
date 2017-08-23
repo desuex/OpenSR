@@ -71,14 +71,14 @@ function getPlanetStyleFromDat(id) {
         cloud1 = "dat:/" + splitted[1]
         cloud1Speed = parseFloat(splitted[0])
     }
-    
+
     var style = World.newPlanetStyle();
     style.surface  = "dat:/" + planet["Image"];
     style.cloud0 = cloud0;
     style.cloud1 = cloud1;
     style.atmosphere = color
     style.radius = planet["Radius"];
-    
+
     return style
 }
 
@@ -166,7 +166,7 @@ ship1.affiliation = World.Ship.People;
 ship1.rank        = World.Ship.Diplomat;
 ship1.style       = shipStyleByAffiliation(ship1);
 ship1.style.width = 128;
-
+context.playerShip = ship1;
 
 context.currentSystem = system;
 

@@ -116,6 +116,11 @@ Ship::ShipRank Ship::rank() const
     return m_rank;
 }
 
+void Ship::evalTrajectoryTo(const QPointF &dest)
+{
+    auto startPos = this->position();
+}
+
 void Ship::setAffiliation(Ship::ShipAffiliation affiliation)
 {
     if (m_affiliation == affiliation)

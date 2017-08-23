@@ -34,7 +34,9 @@ class OPENSR_WORLD_API WorldContext: public WorldObject
     OPENSR_WORLD_OBJECT
 
     Q_PROPERTY(PlanetarySystem* currentSystem READ currentSystem WRITE setCurrentSystem NOTIFY currentSystemChanged STORED false)
-    Q_PROPERTY(ResourceManager* resources READ resources NOTIFY resourcesChanged STORED false)
+    Q_PROPERTY(ResourceManager* resources  READ resources  NOTIFY resourcesChanged  STORED false)
+    Q_PROPERTY(WorldObject*     playerShip READ playerShip NOTIFY playerShipChanged STORED false
+                                           WRITE setPlayerShip)
 
 public:
     Q_INVOKABLE WorldContext(WorldObject *parent = 0, quint32 id = 0);
@@ -42,7 +44,7 @@ public:
 
     PlanetarySystem* currentSystem() const;
     ResourceManager* resources() const;
-    
+
     Q_INVOKABLE QObject* findObject(const QString& name) const;
 
     void setCurrentSystem(PlanetarySystem *system);
@@ -53,13 +55,19 @@ public:
     virtual bool save(QDataStream &stream) const;
     virtual bool load(QDataStream &stream, const QMap<quint32, WorldObject*>& objects);
 
+    WorldObject *playerShip() const;
+    void setPlayerShip(WorldObject *);
+
 Q_SIGNALS:
     void currentSystemChanged();
     void resourcesChanged();
 
+    void playerShipChanged(WorldObject* playerShip);
+
 private:
     PlanetarySystem *m_currentSystem;
     ResourceManager *m_resources;
+    WorldObject* m_playerShip;
 };
 }
 }
