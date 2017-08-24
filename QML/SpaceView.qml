@@ -11,7 +11,7 @@ Item {
     property int maxScrollTime: 600
 
     property var trajectoryView
-    property var playerTrajectoryView
+    //property var playerTrajectoryView
 
     anchors.fill: parent
 
@@ -320,6 +320,11 @@ Item {
         onClicked: WorldManager.startTurn()
     }
 
+    TrajectoryItem {
+        id: playerTrajectoryView
+        anchors.fill: parent
+    }
+
     MouseArea {
         id: spaceMouseOverlay
         anchors.fill: parent
@@ -331,7 +336,11 @@ Item {
             mouse.accepted = true;
             console.log("left clicked in space")
             //console.log(World.context.playerShip)
+
+            console.log( spaceNode.mapFromItem(view, 0, 0, view.width, view.height) );
             World.context.playerShip.evalTrajectoryTo( Qt.point(mouse.x, mouse.y) );
+            playerTrajectoryView.object = null;
+            playerTrajectoryView.object = World.context.playerShip
         }
     }
 }
