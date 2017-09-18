@@ -337,8 +337,13 @@ Item {
             console.log("left clicked in space")
             //console.log(World.context.playerShip)
 
-            console.log( spaceNode.mapFromItem(view, 0, 0, view.width, view.height) );
-            World.context.playerShip.evalTrajectoryTo( Qt.point(mouse.x, mouse.y) );
+            var topLeft =  spaceNode.mapFromItem(view, 0, 0, view.width, view.height);
+            console.log(topLeft, topLeft.x, topLeft.left, topLeft.y, topLeft.top);
+
+            //var pos = World.context.playerShip.position;
+            //var dest = spaceNode.mapFromItem(view, , view.width, view.height);
+            World.context.playerShip.evalTrajectoryTo(Qt.point(mouse.x + topLeft.x, mouse.y + topLeft.y));
+            //console.log( spaceNode.mapFromItem(view, World.0, 0, view.width, view.height) );
             playerTrajectoryView.object = null;
             playerTrajectoryView.object = World.context.playerShip
         }

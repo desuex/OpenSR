@@ -140,12 +140,14 @@ void Ship::evalTrajectoryTo(const QPointF &dest)
     qDebug() << Q_FUNC_INFO;
     auto startPos = this->position();
 
+    qDebug() << "from" << startPos << "to" << dest;
+
     auto dx = qAbs(dest.x() - startPos.x());
     auto dy = qAbs(dest.y() - startPos.y());
     qDebug() << startPos << dest;
     qDebug() << QString("dx = %1, dy = %2").arg(dx).arg(dy);
 
-    const int h = 50.0;
+    const int h = 20.0;
     const qreal avgSq = qSqrt(dx*dx + dy*dy);
     QList<BezierCurve> traj;
     if (dx>dy) {
@@ -161,7 +163,17 @@ void Ship::evalTrajectoryTo(const QPointF &dest)
             traj.append(curve);
         }
     } else {
-
+        qreal alphaTan = dx/dy;
+        auto dyStep = h * dy / avgSq;
+        int fullSteps = static_cast<int>(dy/dyStep);
+        for (int i=1; i<=fullSteps; ++i) {
+            const qreal yy = dyStep * static_cast<qreal>(i);
+            const qreal xx = yy * alphaTan;
+            auto p = QPointF(xx,yy);
+            auto curve = BezierCurve();
+            curve.p0 = curve.p1 = curve.p2 = curve.p3 = startPos+p;
+            traj.append(curve);
+        }
     }
 
     setTrajectory(traj);
