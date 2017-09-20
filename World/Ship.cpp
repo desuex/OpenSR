@@ -35,8 +35,11 @@ void WorldObject::registerType<Ship>(QQmlEngine *qml, QJSEngine *script)
     qRegisterMetaTypeStreamOperators<ShipStyle>();
     qRegisterMetaType<ShipStyle::Data>();
     qRegisterMetaTypeStreamOperators<ShipStyle::Data>();
+
     bindEnumsToJS<Ship>(script);
     qmlRegisterType<Ship>("OpenSR.World", 1, 0, "Ship");
+
+    qRegisterMetaTypeStreamOperators<BezierCurve>();
 }
 
 template<>

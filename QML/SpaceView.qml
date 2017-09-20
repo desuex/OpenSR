@@ -11,7 +11,6 @@ Item {
     property int maxScrollTime: 600
 
     property var trajectoryView
-    //property var playerTrajectoryView
 
     anchors.fill: parent
 
@@ -77,18 +76,23 @@ Item {
         var o = component.createObject(spaceNode, {object: system, mouseDelta: 50});
         o.entered.connect(showDebugTooltip);
         o.exited.connect(hideDebugTooltip);
+        console.log("WorldManager.context.playerShip.id = ", WorldManager.context.playerShip.id);
         for (var c in system.children) {
-            // TODO: don't show trajectory of player ship here
-            o = component.createObject(spaceNode, {object: system.children[c]});
+            var obj = system.children[c];
+            console.log(obj, obj.position);
+            o = component.createObject(spaceNode, {object: obj});
             o.entered.connect(showDebugTooltip);
             o.exited.connect(hideDebugTooltip);
-            o.entered.connect(showTrajectory);
-            o.exited.connect(hideTrajectory);
-        }
 
+            if (WorldManager.context.playerShip.id === obj.id) {
+                console.log("player ship gotten")
+            } else {
+                o.entered.connect(showTrajectory);
+                o.exited.connect(hideTrajectory);
+            }
+        }
         var trajComponent = Qt.createComponent("TrajectoryItem.qml");
-//        console.log( system.children[0] );
-        trajectoryView = trajComponent.createObject(spaceNode, {object: system.children[0], visible: false});
+        trajectoryView = trajComponent.createObject(spaceNode, {object: obj, visible: false});
     }
 
     DebugTooltip {
@@ -132,6 +136,7 @@ Item {
             duration: maxScrollTime * 1000
             alwaysRunToEnd: false
         }
+        onStopped: playerTrajectoryView.updateVRect()
     }
     ParallelAnimation {
         id: vAnim
@@ -149,6 +154,7 @@ Item {
             duration: maxScrollTime * 1000
             alwaysRunToEnd: false
         }
+        onStopped: playerTrajectoryView.updateVRect()
     }
 
     MouseArea {
@@ -171,6 +177,7 @@ Item {
         }
         onExited: { hAnim.stop() }
     }
+
     MouseArea {
         id: rightHoverArea
 
@@ -322,8 +329,22 @@ Item {
 
     TrajectoryItem {
         id: playerTrajectoryView
+        //anchors.fill: parent
+        alwaysVisible: true
         anchors.fill: parent
+
+        function updateVRect() {
+            visibleRect = spaceNode.mapFromItem(view, 0, 0, view.width, view.height);
+            console.log("player Vrect = ", visibleRect);
+        }
+
+        function updateTraj() {
+            updateVRect();
+            object = null;
+            object = WorldManager.context.playerShip
+        }
     }
+
 
     MouseArea {
         id: spaceMouseOverlay
@@ -344,8 +365,7 @@ Item {
             //var dest = spaceNode.mapFromItem(view, , view.width, view.height);
             World.context.playerShip.evalTrajectoryTo(Qt.point(mouse.x + topLeft.x, mouse.y + topLeft.y));
             //console.log( spaceNode.mapFromItem(view, World.0, 0, view.width, view.height) );
-            playerTrajectoryView.object = null;
-            playerTrajectoryView.object = World.context.playerShip
+            playerTrajectoryView.updateTraj();
         }
     }
 }

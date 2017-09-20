@@ -20,6 +20,7 @@
 #include <QVariantList>
 #include <QLinkedList>
 #include <QVector2D>
+#include <QtCore/QDebug>
 
 namespace OpenSR
 {
@@ -100,4 +101,26 @@ QList<QPointF> BezierCurve::calcPolyline(int minStep)
 
     return result;
 }
+
+QDataStream &operator<<(QDataStream &stream, const BezierCurve &c)
+{
+//    return stream << QString("BezierCurve(%1,%2,%3,%4)")
+//                     .arg(c.p0)
+//                     .arg(c.p1)
+//                     .arg(c.p2)
+//                     .arg(c.p3);
+    return stream << QString("BezierCurve(")
+                  << c.p0
+                  << c.p1
+                  << c.p2
+                  << c.p3
+                  << QString(")");
+}
+
+QDataStream &operator>>(QDataStream &stream, const BezierCurve &)
+{
+    qWarning() << Q_FUNC_INFO << "not implemented";
+    return stream;
+}
+
 }
