@@ -19,7 +19,11 @@
 #include "OpenSR/SoundManager.h"
 #include "SoundManager_p.h"
 
+#ifdef WITH_OPENAL_SOUND
 #include <AL/alc.h>
+#else
+typedef uint ALuint;
+#endif
 
 #include <QtEndian>
 #include <QFileInfo>
@@ -48,6 +52,7 @@ struct WAVFMTHeader
 };
 }
 
+#ifdef WITH_OPENAL_SOUND
 SampleData::SampleData(): m_alID(0)
 {
     alGenBuffers(1, &m_alID);
@@ -57,6 +62,10 @@ SampleData::~SampleData()
 {
     alDeleteBuffers(1, &m_alID);
 }
+#else
+SampleData::SampleData() {}
+SampleData::~SampleData() {}
+#endif
 
 Sample::Sample()
 {
@@ -73,40 +82,51 @@ Sample::~Sample()
 
 ALuint Sample::openALBufferID() const
 {
+#ifdef WITH_OPENAL_SOUND
     if (!d)
         return 0;
 
     return d->m_alID;
+#else
+    return 0;
+#endif
 }
 
 SoundManager::SoundManager(QObject *parent):
     QObject(parent), d_osr_ptr(new SoundManager::SoundManagerPrivate())
 {
+#ifdef WITH_OPENAL_SOUND
     Q_D(SoundManager);
     d->device = alcOpenDevice(alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER));
     d->context = alcCreateContext(d->device, NULL);
     alcMakeContextCurrent(d->context);
+#endif
 }
 
 SoundManager::~SoundManager()
 {
+#ifdef WITH_OPENAL_SOUND
     Q_D(SoundManager);
     alcMakeContextCurrent(0);
     alcDestroyContext(d->context);
     alcCloseDevice(d->device);
+#endif
 }
 
 void SoundManager::start()
 {
+#ifdef WITH_OPENAL_SOUND
     Q_D(SoundManager);
     ALfloat direction[] = { 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f };
     alListener3f(AL_POSITION, 0, 0, 0);
     alListener3f(AL_VELOCITY, 0, 0, 0);
     alListenerfv(AL_ORIENTATION, direction);
+#endif
 }
 
 QSharedPointer<SampleData> SoundManager::SoundManagerPrivate::loadWAVFile(QIODevice* d)
 {
+#ifdef WITH_OPENAL_SOUND
     quint32 header[3];
     d->read((char *)header, 3 * 4);
 
@@ -163,10 +183,14 @@ QSharedPointer<SampleData> SoundManager::SoundManagerPrivate::loadWAVFile(QIODev
     alBufferData(data->m_alID, alFormat, samples.constData(), samples.size(), fmtHeader.sampleRate);
 
     return data;
+#else
+    return nullptr;
+#endif
 }
 
 Sample SoundManager::loadSample(const QUrl& url)
 {
+#ifdef WITH_OPENAL_SOUND
     Q_D(SoundManager);
 
     auto it = d->m_soundCache.find(url);
@@ -201,6 +225,9 @@ Sample SoundManager::loadSample(const QUrl& url)
 
     d->m_soundCache[url] = data;
     return Sample(data);
+#else
+    return Sample();
+#endif
 }
 
 MusicDecoder *SoundManager::getMusicDecoder(const QUrl& url, QObject *parent)

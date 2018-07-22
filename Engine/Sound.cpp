@@ -25,7 +25,9 @@
 
 namespace OpenSR
 {
-Sound::Sound(QObject *parent): QObject(parent), m_volume(1.0), m_alSource(0)
+Sound::Sound(QObject *parent): QObject(parent), m_volume(1.0)
+#if WITH_OPENAL_SOUND
+  , m_alSource(0)
 {
     alGenSources((ALuint)1, &m_alSource);
 
@@ -35,19 +37,27 @@ Sound::Sound(QObject *parent): QObject(parent), m_volume(1.0), m_alSource(0)
     alSource3f(m_alSource, AL_VELOCITY, 0, 0, 0);
     alSourcei(m_alSource, AL_LOOPING, AL_FALSE);
 }
+#else
+{}
+#endif
 
 Sound::~Sound()
 {
+#if WITH_OPENAL_SOUND
     alDeleteSources(1, &m_alSource);
+#endif
 }
 
 void Sound::play()
 {
+#if WITH_OPENAL_SOUND
     alSourcePlay(m_alSource);
+#endif
 }
 
 void Sound::setSource(const QUrl& source)
 {
+#if WITH_OPENAL_SOUND
     m_source = source;
 
     if (!source.isLocalFile() && source.scheme().compare("qrc", Qt::CaseInsensitive) &&
@@ -61,6 +71,7 @@ void Sound::setSource(const QUrl& source)
     alSourcei(m_alSource, AL_BUFFER, m_sample.openALBufferID());
 
     emit(sourceChanged());
+#endif
 }
 
 QUrl Sound::source() const
@@ -70,9 +81,11 @@ QUrl Sound::source() const
 
 void Sound::setVolume(float volume)
 {
+#if WITH_OPENAL_SOUND
     m_volume = volume;
     alSourcef(m_alSource, AL_GAIN, m_volume);
     emit(volumeChanged());
+#endif
 }
 
 float Sound::volume() const

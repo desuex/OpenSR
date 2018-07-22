@@ -22,6 +22,7 @@ OPTION(BUILD_RESOURCE_VIEWER "Build Resource Viewer tool" NO)
 OPTION(BUILD_PLANET_VIEWER "Build Planet Viewer tool" NO)
 OPTION(BUILD_QUEST_PLAYER "Build Quest Player tool" NO)
 OPTION(BUILD_DAT_TOOLS "Build tools for DAT files" NO)
+OPTION(WITH_OPENAL_SOUND "Support sound using OpenAL library" YES)
 
 IF(BUILD_ALL_TOOLS)
     SET(BUILD_RESOURCE_VIEWER YES)

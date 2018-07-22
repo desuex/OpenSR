@@ -52,7 +52,9 @@ Q_SIGNALS:
 private:
     QUrl m_source;
     Sample m_sample;
+#ifdef WITH_OPENAL_SOUND
     ALuint m_alSource;
+#endif
     float m_volume;
 };
 }

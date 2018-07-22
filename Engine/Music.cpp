@@ -34,6 +34,7 @@ const int BUFFER_COUNT = 5;
 Music::Music(QObject *parent): QObject(parent),
     m_volume(1.0), m_alSource(0), m_freeBuffers(BUFFER_COUNT), m_decoder(0)
 {
+#ifdef WITH_OPENAL_SOUND
     alGenSources((ALuint)1, &m_alSource);
 
     alSourcef(m_alSource, AL_PITCH, 1);
@@ -49,13 +50,16 @@ Music::Music(QObject *parent): QObject(parent),
     m_timer.setInterval(BUFFER_SIZE_MS);
 
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(queue()));
+#endif
 }
 
 Music::~Music()
 {
+#ifdef WITH_OPENAL_SOUND
     alDeleteSources(1, &m_alSource);
     alDeleteBuffers(BUFFER_COUNT, m_alBuffers);
     delete[] m_alBuffers;
+#endif
 }
 
 void Music::setSource(const QUrl& source)
@@ -72,7 +76,9 @@ QUrl Music::source() const
 void Music::setVolume(float volume)
 {
     m_volume = volume;
+#ifdef WITH_OPENAL_SOUND
     alSourcef(m_alSource, AL_GAIN, m_volume);
+#endif
     emit(volumeChanged());
 }
 
@@ -83,14 +89,17 @@ float Music::volume() const
 
 void Music::pause()
 {
+#ifdef WITH_OPENAL_SOUND
     alSourcePause(m_alSource);
+#endif
     m_timer.stop();
 }
 
 void Music::stop()
 {
-
+#ifdef WITH_OPENAL_SOUND
     alSourceStop(m_alSource);
+#endif
     m_timer.stop();
 }
 
@@ -98,11 +107,14 @@ void Music::stop()
 void Music::play()
 {
     m_timer.start();
+#ifdef WITH_OPENAL_SOUND
     alSourcePlay(m_alSource);
+#endif
 }
 
 void Music::queue()
 {
+#ifdef WITH_OPENAL_SOUND
     ALint doneBuffers = 0;
     alGetSourcei(m_alSource, AL_BUFFERS_PROCESSED, &doneBuffers);
 
@@ -148,10 +160,12 @@ void Music::queue()
 
     if (m_freeBuffers == BUFFER_COUNT && m_decoder->done())
         emit(finished());
+#endif
 }
 
 void Music::resetDecoding()
 {
+#ifdef WITH_OPENAL_SOUND
     stop();
     if (m_decoder)
     {
@@ -161,7 +175,10 @@ void Music::resetDecoding()
     m_decoder = ((Engine *)qApp)->sound()->getMusicDecoder(m_source, this);
 
     if (!m_decoder)
+    {
+        qDebug() << "Bad music decoder";
         return;
+    }
 
     if (!m_decoder->valid())
     {
@@ -196,6 +213,7 @@ void Music::resetDecoding()
 
         m_freeBuffers--;
     }
+#endif
 }
 }
 
