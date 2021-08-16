@@ -25,7 +25,7 @@
 #include <QMetaObject>
 #include <QQmlEngine>
 
-class QQmlEngine;
+//class QQmlEngine;
 
 #define WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(Factory, Class)\
     OpenSR::World::Class* Factory::new##Class(WorldObject *parent) {\

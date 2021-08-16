@@ -19,7 +19,7 @@
 #include "OpenSR/SoundManager.h"
 #include "SoundManager_p.h"
 
-#include <AL/alc.h>
+#include <OpenAL/alc.h>
 
 #include <QtEndian>
 #include <QFileInfo>

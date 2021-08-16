@@ -20,7 +20,7 @@
 #define OPENSR_SOUNDMANAGER_H
 
 #include <OpenSR/OpenSR.h>
-#include <AL/al.h>
+#include <OpenAL/al.h>
 
 #include <QObject>
 #include <QSharedPointer>

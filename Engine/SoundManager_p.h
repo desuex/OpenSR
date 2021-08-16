@@ -21,7 +21,7 @@
 
 #include "OpenSR/SoundManager.h"
 
-#include <AL/alc.h>
+#include <OpenAL/alc.h>
 
 #include <QSharedPointer>
 #include <QMap>

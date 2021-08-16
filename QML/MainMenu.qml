@@ -178,13 +178,13 @@ Item {
     }
 
     function newGame() {
-        World.generateWorld("res:/World/DefaultWorldGen.js");
-        changeScreen("qrc:/OpenSR/SpaceView.qml", {"system": World.context.currentSystem});
+        World.WorldManager.generateWorld("res:/World/DefaultWorldGen.js");
+        changeScreen("qrc:/OpenSR/SpaceView.qml", {"system": World.WorldManager.context.currentSystem});
     }
 
     function loadGame() {
-        World.loadWorld("/tmp/test.osr");
-        changeScreen("qrc:/OpenSR/SpaceView.qml", {"system": World.context.currentSystem});
+        World.WorldManager.loadWorld("/tmp/test.osr");
+        changeScreen("qrc:/OpenSR/SpaceView.qml", {"system": World.WorldManager.context.currentSystem});
     }
 
     function componentObjectCreated(object, id)
