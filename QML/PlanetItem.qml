@@ -6,13 +6,13 @@ PlanetDrawer {
     property Planet planet
     id: drawer
 
-    width: planet.style.radius * 2
-    height: planet.style.radius * 2
+    width:  planet ? planet.style.radius * 2 : 0
+    height: width
 
-    surface: planet.style.surface
-    atmosphere: planet.style.atmosphere
-    cloud0: planet.style.cloud0
-    cloud1: planet.style.cloud1
+    surface:    planet ? planet.style.surface : ""
+    atmosphere: planet ? planet.style.atmosphere : ""
+    cloud0:     planet ? planet.style.cloud0 : ""
+    cloud1:     planet ? planet.style.cloud1 : ""
     lightAngle: Math.atan2(planet.position.y, -planet.position.x)
 
     PropertyAnimation {

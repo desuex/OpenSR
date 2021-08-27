@@ -28,15 +28,15 @@
 //class QQmlEngine;
 
 #define WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(Factory, Class)\
-    OpenSR::World::Class* Factory::new##Class(WorldObject *parent) {\
+    OpenSR::World::Class* Factory::Class(WorldObject *parent) {\
         OpenSR::World::Class *obj = WorldObject::createObject<World::Class>(parent);\
         QQmlEngine::setObjectOwnership((QObject*)obj, QQmlEngine::JavaScriptOwnership);\
         return obj;\
     }
 
 #define WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(Factory, Class)\
-    Class Factory::new##Class() {\
-        return World::Class();\
+    Class *Factory::Class() {\
+        return new World::Class();\
     }
 
 namespace OpenSR

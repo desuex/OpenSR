@@ -1,13 +1,13 @@
 var context = World.context;
 
 function genRace(idName, name, icon, color, sound) {
-    var style = World.newRaceStyle();
+    var style = World.RaceStyle();
 
     style.icon = icon;
     style.color = color;
     style.sound = sound;
 
-    var race = World.newRace(context);
+    var race = World.Race(context);
     race.objectName = idName;
     race.name = name;
     race.style = style;
@@ -16,20 +16,20 @@ function genRace(idName, name, icon, color, sound) {
 }
 
 function genSector(idName, name, position) {
-    var sector = World.newSector(context);
+    var sector = World.Sector(context);
     sector.objectName = idName;
     sector.name = name;
     return sector;
 }
 
 function genSystem(idName, sector, name, size, star, starColor, bg) {
-    var style = World.newPlanetarySystemStyle();
+    var style = World.PlanetarySystemStyle();
 
     style.background = bg;
     style.star = star;
     style.starColor = starColor;
 
-    var system = World.newPlanetarySystem(sector);
+    var system = World.PlanetarySystem(sector);
     system.objectName = idName;
     system.name = name;
     system.size = size;
@@ -43,7 +43,7 @@ function createAsteroidStyles() {
     var datStyles = Engine.datValue("Data.SE.Asteroid");
     for (var k in datStyles)
     {
-        style = World.newAsteroidStyle();
+        style = World.AsteroidStyle();
         style.texture = "dat:/" + datStyles[k]["Image"];
         style.color = "#FFFFFF";
         asteroidStyles[k] = style;
@@ -71,7 +71,6 @@ function getPlanetStyleFromDat(id) {
         cloud1 = "dat:/" + splitted[1]
         cloud1Speed = parseFloat(splitted[0])
     }
-
     var style = World.newPlanetStyle();
     style.surface  = "dat:/" + planet["Image"];
     style.cloud0 = cloud0;
@@ -100,7 +99,7 @@ var styleCount = Object.keys(asteroidStyles).length
 var i = 0
 for(var k in asteroidStyles)
 {
-    var asteroid = World.newAsteroid(system);
+    var asteroid = World.Asteroid(system);
     asteroid.objectName = "Asteroid." + k;
     asteroid.style = asteroidStyles[k];
     asteroid.period = 15;
@@ -110,7 +109,7 @@ for(var k in asteroidStyles)
     i++
 }
 
-var planet = World.newInhabitedPlanet(system);
+var planet = World.InhabitedPlanet(system);
 planet.name = "PlanetName.Solar.2"
 planet.style = getPlanetStyleFromDat("200")
 planet.period = 15;
@@ -119,16 +118,16 @@ planet.position = Qt.point(355, -222);
 
 function initStation(obj, kind) {
     switch (kind) {
-        case "ranger":
-        case "rangerCenter":
-        case "rc":
-            obj.stationKind = World.SpaceStation.RangerCenter;
-            obj.style = World.newStationStyle();
-            obj.style.texture = "res:/DATA/Ruins/RC.gai";
+    case "ranger":
+    case "rangerCenter":
+    case "rc":
+        obj.stationKind = World.SpaceStation.RangerCenter;
+        obj.style = World.newStationStyle();
+        obj.style.texture = "res:/DATA/Ruins/RC.gai";
     }
 }
 
-var rangerCenter1 = World.newSpaceStation(system);
+var rangerCenter1 = World.SpaceStation(system);
 initStation(rangerCenter1, "ranger")
 //console.log("rangerCenter1.style = " + rangerCenter1.style);
 rangerCenter1.position = Qt.point(-400, -100);
