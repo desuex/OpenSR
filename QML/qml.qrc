@@ -3,6 +3,7 @@
         <file>Button.qml</file>
         <file>qmldir</file>
         <file>MainMenu.qml</file>
+        <file>AB.qml</file>
         <file>GameWindow.qml</file>
         <file>QuestSelectionMenu.qml</file>
         <file>ScreenLoader.js</file>

@@ -18,7 +18,7 @@
 
 #include "WorldBindings.h"
 #include "WorldManager.h"
-
+#include <QtQml/QQmlEngine>
 namespace OpenSR
 {
 namespace World

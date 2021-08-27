@@ -26,6 +26,9 @@ Item {
                 item.source = object.style.texture
             } else if(WorldManager.typeName(object.typeId) === "OpenSR::World::InhabitedPlanet") {
                 item.planet = object
+            } else if(WorldManager.typeName(object.typeId) === "OpenSR::World::Ship") {
+                item.source = object.style.texture
+                item.height = item.width = object.style.width
             } else if(WorldManager.typeName(object.typeId) === "OpenSR::World::SpaceStation") {
                 item.source = object.style.texture
             }
@@ -70,6 +73,9 @@ Item {
             objectLoader.sourceComponent = planetComponent
             positioning = true
         } else if(WorldManager.typeName(object.typeId) === "OpenSR::World::SpaceStation") {
+            objectLoader.sourceComponent = defaultComponent
+            positioning = true
+        } else if(WorldManager.typeName(object.typeId) === "OpenSR::World::Ship") {
             objectLoader.sourceComponent = defaultComponent
             positioning = true
         }

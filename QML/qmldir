@@ -6,3 +6,5 @@ MainMenu 1.0 MainMenu.qml
 SpaceObjectItem 1.0 SpaceObjectItem.qml
 PlanetItem 1.0 PlanetItem.qml
 DebugTooltip 1.0 DebugTooltip.qml
+TrajectoryItem 1.0 TrajectoryItem.qml
+AB 1.0 AB.qml

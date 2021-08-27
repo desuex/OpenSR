@@ -128,6 +128,14 @@ void writeDATTree(QIODevice *dev, const QVariant& node, const QString& name)
     }
 }
 
+void readRAWTree(QIODevice *dev, QVariantMap* parent, bool isCache)
+{
+    uint32_t loadVersion;
+    float ab_WorldRadius;
+    dev->read((char*)&loadVersion, 4);
+    dev->read((char*)&ab_WorldRadius, 4);
+
+}
 void readDATTree(QIODevice *dev, QVariantMap* parent, bool isCache)
 {
     uint8_t isTree = 0;
@@ -236,6 +244,32 @@ QVariantMap loadDAT(QIODevice *dev, bool isCache)
 }
 
 void saveDAT(QIODevice *dev, const QVariant& root)
+{
+    writeDATTree(dev, root, QString());
+}
+QVariantMap loadRAW(QIODevice *dev, bool isCache)
+{
+
+    QVariantMap root;
+    uint32_t sig;
+    dev->peek((char *)&sig, 4);
+
+    if (sig == 0x57424152)
+    {
+        QByteArray whole = dev->readAll();
+//        QByteArray datData = unpackZL(whole);
+        QBuffer dat(&whole);
+        dat.open(QIODevice::ReadOnly);
+        readRAWTree(&dat, &root, isCache);
+        dat.close();
+    }
+    else
+        readDATTree(dev, &root, isCache);
+
+    return root;
+}
+
+void saveRAW(QIODevice *dev, const QVariant& root)
 {
     writeDATTree(dev, root, QString());
 }

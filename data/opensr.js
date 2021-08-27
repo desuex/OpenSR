@@ -1,5 +1,5 @@
-Engine.addDATFile("res:/main.dat")
-Engine.addDATFile("res:/rus.dat")
+Engine.addDATFile("res:/Main.dat")
+Engine.addDATFile("res:/Rus.dat")
 Engine.addDATFile("res:/CacheData.dat", true)
 
 var dir = Engine.dataDir
@@ -15,4 +15,5 @@ Engine.resources.addPKGArchive(dir + "/Sound.pkg")
 Engine.resources.addPKGArchive(dir + "/Star.pkg")
 
 Engine.loadPlugin("world")
+Engine.loadPlugin("datplugin")
 Engine.showQMLComponent("qrc:/OpenSR/MainMenu.qml")

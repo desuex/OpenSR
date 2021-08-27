@@ -41,6 +41,8 @@ public:
 
     QList<QPointF> calcPolyline(int minStep = 1);
 };
+QDataStream& operator<<(QDataStream & stream, const BezierCurve& );
+QDataStream& operator>>(QDataStream & stream, const BezierCurve& );
 }
 
 Q_DECLARE_METATYPE(OpenSR::BezierCurve)

@@ -1,9 +1,11 @@
 import QtQuick 2.3
 import OpenSR 1.0
-import OpenSR.World 1.0
+import OpenSR.World 1.0 as World
+import OpenSR.DatPlugin 1.0 as DatPlugin
+
 
 Item {
-    property PlanetarySystem system
+    property World.PlanetarySystem system
     property int speed: 500
     property int bgSpeed: 10
     property int scrollSize: 10
@@ -13,9 +15,9 @@ Item {
     property var trajectoryView
 
     anchors.fill: parent
-    
+
     id: view
-    
+
     Rectangle {
         anchors.fill: parent
         color: "black"
@@ -76,16 +78,23 @@ Item {
         var o = component.createObject(spaceNode, {object: system, mouseDelta: 50});
         o.entered.connect(showDebugTooltip);
         o.exited.connect(hideDebugTooltip);
+        console.log("WorldManager.context.playerShip.id = ", World.WorldManager.context.playerShip.id);
         for (var c in system.children) {
-            o = component.createObject(spaceNode, {object: system.children[c]});
+            var obj = system.children[c];
+            console.log(obj, obj.position);
+            o = component.createObject(spaceNode, {object: obj});
             o.entered.connect(showDebugTooltip);
             o.exited.connect(hideDebugTooltip);
-            o.entered.connect(showTrajectory);
-            o.exited.connect(hideTrajectory);
-        }
 
+            if (World.WorldManager.context.playerShip.id === obj.id) {
+                console.log("player ship gotten")
+            } else {
+                o.entered.connect(showTrajectory);
+                o.exited.connect(hideTrajectory);
+            }
+        }
         var trajComponent = Qt.createComponent("TrajectoryItem.qml");
-        trajectoryView = trajComponent.createObject(spaceNode, {object: system.children[0], visible: false});
+        trajectoryView = trajComponent.createObject(spaceNode, {object: obj, visible: false});
     }
 
     DebugTooltip {
@@ -94,6 +103,7 @@ Item {
     }
 
     function showTrajectory(object) {
+//        console.log("Show trajectory of ", JSON.stringify(object))
         trajectoryView.visibleRect = spaceNode.mapFromItem(view, 0, 0, view.width, view.height)
         if (trajectoryView.object !== object)
             trajectoryView.object = object;
@@ -128,6 +138,7 @@ Item {
             duration: maxScrollTime * 1000
             alwaysRunToEnd: false
         }
+        onStopped: playerTrajectoryView.updateVRect()
     }
     ParallelAnimation {
         id: vAnim
@@ -145,6 +156,7 @@ Item {
             duration: maxScrollTime * 1000
             alwaysRunToEnd: false
         }
+        onStopped: playerTrajectoryView.updateVRect()
     }
 
     MouseArea {
@@ -167,6 +179,7 @@ Item {
         }
         onExited: { hAnim.stop() }
     }
+
     MouseArea {
         id: rightHoverArea
 
@@ -313,6 +326,48 @@ Item {
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         text: "Turn"
-        onClicked: WorldManager.startTurn()
+        onClicked: World.WorldManager.startTurn()
+    }
+
+    TrajectoryItem {
+        id: playerTrajectoryView
+        //anchors.fill: parent
+        alwaysVisible: true
+        anchors.fill: parent
+
+        function updateVRect() {
+            visibleRect = spaceNode.mapFromItem(view, 0, 0, view.width, view.height);
+            console.log("player Vrect = ", visibleRect);
+        }
+
+        function updateTraj() {
+            updateVRect();
+            object = null;
+            object = World.WorldManager.context.playerShip
+        }
+    }
+
+
+    MouseArea {
+        id: spaceMouseOverlay
+        anchors.fill: parent
+        propagateComposedEvents: true
+        onClicked: {
+            if (mouse.button !== Qt.LeftButton)
+                return;
+
+            mouse.accepted = true;
+            console.log("left clicked in space")
+            //console.log(World.context.playerShip)
+
+            var topLeft =  spaceNode.mapFromItem(view, 0, 0, view.width, view.height);
+            console.log(topLeft, topLeft.x, topLeft.left, topLeft.y, topLeft.top);
+
+            //var pos = World.context.playerShip.position;
+            //var dest = spaceNode.mapFromItem(view, , view.width, view.height);
+            World.WorldManager.context.playerShip.evalTrajectoryTo(Qt.point(mouse.x + topLeft.x, mouse.y + topLeft.y));
+            //console.log( spaceNode.mapFromItem(view, World.0, 0, view.width, view.height) );
+            playerTrajectoryView.updateTraj();
+        }
     }
 }

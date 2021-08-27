@@ -92,6 +92,7 @@ Engine::Engine(int& argc, char** argv): QApplication(argc, argv),
     d->resources = new ResourceManager(this);
 
     d->qmlEngine = new QQmlApplicationEngine();
+    d->qmlEngine->addImportPath("./extensions");
 
     QML::QMLHelper::registerQMLTypes("OpenSR");
     d->qmlEngine->setNetworkAccessManagerFactory(d->resources->qmlNAMFactory());
@@ -122,7 +123,7 @@ int Engine::run()
     
     d->qmlEngine->addImportPath(d->dataDir);
     d->qmlEngine->addImportPath(":/");
-
+    d->qmlEngine->addImportPath("./extensions");
     d->qmlEngine->addPluginPath(libraryPath);
 
     d->resources->addFileSystemPath(d->dataDir);

@@ -17,55 +17,203 @@
 */
 
 #include "Ship.h"
+#include "WorldBindings.h"
+#include "ResourceManager.h"
 
-#include <QtQml>
+#include <QtQml/QQmlEngine>
+#include <QtMath>
 
 namespace OpenSR
 {
-namespace World
-{
-const quint32 Ship::m_staticTypeId = typeIdFromClassName(Ship::staticMetaObject.className());
+    namespace World
+    {
+        const quint32 Ship::m_staticTypeId = typeIdFromClassName(Ship::staticMetaObject.className());
 
-template<>
-void WorldObject::registerType<Ship>(QQmlEngine *qml, QJSEngine *script)
-{
-    qmlRegisterType<Ship>("OpenSR.World", 1, 0, "Ship");
-}
+        template<>
+        void WorldObject::registerType<Ship>(QQmlEngine *qml, QJSEngine *script)
+        {
+            qRegisterMetaType<ShipStyle>();
+            qRegisterMetaTypeStreamOperators<ShipStyle>();
+            qRegisterMetaType<ShipStyle::Data>();
+            qRegisterMetaTypeStreamOperators<ShipStyle::Data>();
 
-template<>
-Ship* WorldObject::createObject(WorldObject *parent, quint32 id)
-{
-    return new Ship(parent, id);
-}
+            bindEnumsToJS<Ship>(script);
+            qmlRegisterType<Ship>("OpenSR.World", 1, 0, "Ship");
 
-template<>
-quint32 WorldObject::staticTypeId<Ship>()
-{
-    return Ship::m_staticTypeId;
-}
+            qRegisterMetaTypeStreamOperators<BezierCurve>();
+        }
 
-template<>
-const QMetaObject* WorldObject::staticTypeMeta<Ship>()
-{
-    return &Ship::staticMetaObject;
-}
+        template<>
+        Ship* WorldObject::createObject(WorldObject *parent, quint32 id)
+        {
+            return new Ship(parent, id);
+        }
 
-Ship::Ship(WorldObject *parent, quint32 id): MannedObject(parent, id)
-{
-}
+        template<>
+        quint32 WorldObject::staticTypeId<Ship>()
+        {
+            return Ship::m_staticTypeId;
+        }
 
-Ship::~Ship()
-{
-}
+        template<>
+        const QMetaObject* WorldObject::staticTypeMeta<Ship>()
+        {
+            return &Ship::staticMetaObject;
+        }
 
-quint32 Ship::typeId() const
-{
-    return Ship::m_staticTypeId;
-}
+        /**************************************************************************************************/
 
-QString Ship::namePrefix() const
-{
-    return tr("Ship");
-}
-}
+        int ShipStyle::width() const
+        {
+            return getData<Data>().width;
+        }
+
+        void ShipStyle::setWidth(int w)
+        {
+            auto d = getData<Data>();
+            d.width = w;
+            setData(d);
+        }
+
+        QString ShipStyle::texture() const
+        {
+            return getData<Data>().texture;
+        }
+
+        void ShipStyle::setTexture(const QString &texture)
+        {
+            auto d = getData<Data>();
+            d.texture = texture;
+            setData(d);
+        }
+
+        QDataStream& operator<<(QDataStream & stream, const ShipStyle& style)
+        {
+            return stream << style.id();
+        }
+
+        QDataStream& operator>>(QDataStream & stream, ShipStyle& style)
+        {
+            quint32 id;
+            stream >> id;
+            ResourceManager *m = ResourceManager::instance();
+            Q_ASSERT(m != 0);
+            Resource::replaceData(style, m->getResource(id));
+            return stream;
+        }
+
+        QDataStream& operator<<(QDataStream & stream, const ShipStyle::Data& data)
+        {
+            return stream << data.width << data.texture;
+        }
+
+        QDataStream& operator>>(QDataStream & stream, ShipStyle::Data& data)
+        {
+            return stream >> data.width >> data.texture;
+        }
+
+
+        /*  Ship */
+        Ship::Ship(WorldObject *parent, quint32 id): MannedObject(parent, id)
+        {
+        }
+
+        Ship::~Ship()
+        {
+        }
+
+        quint32 Ship::typeId() const
+        {
+            return Ship::m_staticTypeId;
+        }
+
+        QString Ship::namePrefix() const
+        {
+            return tr("Ship");
+        }
+
+        Ship::ShipAffiliation Ship::affiliation() const
+        {
+            return m_affiliation;
+        }
+
+        Ship::ShipRank Ship::rank() const
+        {
+            return m_rank;
+        }
+
+        void Ship::setAffiliation(Ship::ShipAffiliation affiliation)
+        {
+            if (m_affiliation == affiliation)
+                return;
+
+            m_affiliation = affiliation;
+            emit affiliationChanged(m_affiliation);
+        }
+
+        void Ship::setRank(Ship::ShipRank rank)
+        {
+            if (m_rank == rank)
+                return;
+
+            m_rank = rank;
+            emit rankChanged(m_rank);
+        }
+
+        void Ship::evalTrajectoryTo(const QPointF &dest)
+        {
+            qDebug() << Q_FUNC_INFO;
+            auto startPos = this->position();
+
+            qDebug() << "from" << startPos << "to" << dest;
+
+            auto dx = qAbs(dest.x() - startPos.x());
+            auto dy = qAbs(dest.y() - startPos.y());
+            qDebug() << startPos << dest;
+            qDebug() << QString("dx = %1, dy = %2").arg(dx).arg(dy);
+
+            const int h = 20.0;
+            const qreal avgSq = qSqrt(dx*dx + dy*dy);
+            QList<BezierCurve> traj;
+            if (dx>dy) {
+                qreal alphaTan = dy / dx;
+                auto dxStep = h * dx / avgSq;
+                int fullSteps = static_cast<int>(dx/dxStep);
+                for (int i=1; i<=fullSteps; ++i) {
+                    const qreal xx = dxStep * static_cast<qreal>(i);
+                    const qreal yy = xx * alphaTan;
+                    auto p = QPointF(xx,yy);
+                    auto curve = BezierCurve();
+                    curve.p0 = curve.p1 = curve.p2 = curve.p3 = startPos+p;
+                    traj.append(curve);
+                }
+            } else {
+                qreal alphaTan = dx/dy;
+                auto dyStep = h * dy / avgSq;
+                int fullSteps = static_cast<int>(dy/dyStep);
+                for (int i=1; i<=fullSteps; ++i) {
+                    const qreal yy = dyStep * static_cast<qreal>(i);
+                    const qreal xx = yy * alphaTan;
+                    auto p = QPointF(xx,yy);
+                    auto curve = BezierCurve();
+                    curve.p0 = curve.p1 = curve.p2 = curve.p3 = startPos+p;
+                    traj.append(curve);
+                }
+            }
+
+            setTrajectory(traj);
+            qDebug() << "new trajectory length = " << traj.size();
+        }
+
+        void Ship::setStyle(const ShipStyle &style) {
+            m_style = style;
+            emit(styleChanged(style));
+        }
+
+        ShipStyle Ship::style() const {
+            return m_style;
+        }
+
+
+    }
 }
