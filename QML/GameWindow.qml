@@ -4,6 +4,7 @@ import OpenSR 1.0
 
 Window
 {
+
     width: 1024
     height: 768
     visible: true

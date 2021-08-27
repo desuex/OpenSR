@@ -20,7 +20,7 @@
 
 #include <QMap>
 #include <QDataStream>
-
+#include <QtQml/QQmlEngine>
 #include <QtQml>
 
 namespace OpenSR
@@ -121,7 +121,17 @@ bool WorldContext::load(QDataStream &stream, const QMap<quint32, WorldObject*>& 
 
     return stream.status() == QDataStream::Ok;
 }
-
+WorldObject *WorldContext::playerShip() const
+{
+    return m_playerShip;
+}
+void WorldContext::setPlayerShip(WorldObject *ship)
+{
+    if (m_playerShip != ship) {
+        m_playerShip = ship;
+        emit playerShipChanged(ship);
+    }
+}
 ResourceManager* WorldContext::resources() const
 {
     return m_resources;

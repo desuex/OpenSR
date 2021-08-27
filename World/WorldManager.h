@@ -34,6 +34,7 @@
 #include "Asteroid.h"
 #include "Planet.h"
 #include "SpaceStation.h"
+#include "Ship.h"
 
 namespace OpenSR
 {
@@ -96,38 +97,41 @@ public:
     Q_INVOKABLE bool saveWorld(const QString& path);
     Q_INVOKABLE bool loadWorld(const QString& path);
 
-    Q_INVOKABLE OpenSR::World::RaceStyle            *RaceStyle();
-    Q_INVOKABLE OpenSR::World::PlanetarySystemStyle *PlanetarySystemStyle();
-    Q_INVOKABLE OpenSR::World::AsteroidStyle        *AsteroidStyle();
-    Q_INVOKABLE OpenSR::World::PlanetStyle          *PlanetStyle();
-    Q_INVOKABLE OpenSR::World::StationStyle         *StationStyle();
+    // TODO: Move Constructors to Separate factory?
+    Q_INVOKABLE OpenSR::World::ShipStyle newShipStyle();
+    Q_INVOKABLE OpenSR::World::RaceStyle            newRaceStyle();
+    Q_INVOKABLE OpenSR::World::PlanetarySystemStyle newPlanetarySystemStyle();
+    Q_INVOKABLE OpenSR::World::AsteroidStyle        newAsteroidStyle();
+    Q_INVOKABLE OpenSR::World::PlanetStyle          newPlanetStyle();
+    Q_INVOKABLE OpenSR::World::StationStyle         newStationStyle();
 
-    Q_INVOKABLE OpenSR::World::Race*                Race(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Item*                Item(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Goods*               Goods(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Equipment*           Equipment(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Micromodulus*        Micromodulus(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Artefact*            Artefact(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Hull*                Hull(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Engine*              Engine(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Tank*                Tank(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Droid*               Droid(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::CargoHook*           CargoHook(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::DefenceGenerator*    DefenceGenerator(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Radar*               Radar(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Scanner*             Scanner(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Weapon*              Weapon(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Sector*              Sector(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::PlanetarySystem*     PlanetarySystem(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::SpaceObject*         SpaceObject(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Container*           Container(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Asteroid*            Asteroid(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Planet*              Planet(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::MannedObject*        MannedObject(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::InhabitedPlanet*     InhabitedPlanet(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::DesertPlanet*        DesertPlanet(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::Ship*                Ship(OpenSR::World::WorldObject *parent = 0);
-    Q_INVOKABLE OpenSR::World::SpaceStation*        SpaceStation(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Race*                newRace(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Item*                newItem(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Goods*               newGoods(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Equipment*           newEquipment(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Micromodulus*        newMicromodulus(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Artefact*            newArtefact(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Hull*                newHull(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Engine*              newEngine(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Tank*                newTank(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Droid*               newDroid(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::CargoHook*           newCargoHook(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::DefenceGenerator*    newDefenceGenerator(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Radar*               newRadar(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Scanner*             newScanner(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Weapon*              newWeapon(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Sector*              newSector(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::PlanetarySystem*     newPlanetarySystem(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::SpaceObject*         newSpaceObject(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Container*           newContainer(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Asteroid*            newAsteroid(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Planet*              newPlanet(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::MannedObject*        newMannedObject(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::InhabitedPlanet*     newInhabitedPlanet(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::DesertPlanet*        newDesertPlanet(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::Ship*                newShip(OpenSR::World::WorldObject *parent = 0);
+    Q_INVOKABLE OpenSR::World::SpaceStation*        newSpaceStation(OpenSR::World::WorldObject *parent = 0);
+
 
 Q_SIGNALS:
     void contextChanged();

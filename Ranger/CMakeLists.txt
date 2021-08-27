@@ -6,6 +6,7 @@ SET(RANGER_QT_SOURCES
     PKG.cpp
     ZLib.cpp
     DAT.cpp
+    AB.cpp
 )
 
 SET(RANGER_QT_HEADERS

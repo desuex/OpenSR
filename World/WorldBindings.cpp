@@ -18,7 +18,7 @@
 
 #include "WorldBindings.h"
 #include "WorldManager.h"
-
+#include <QtQml/QQmlEngine>
 namespace OpenSR
 {
 namespace World
@@ -48,7 +48,7 @@ class Ship;
 class SpaceStation;
 class ResourceManager;
 
-static QObject* managerSingletonProvider(QQmlEngine *engine, QJSEngine *scriptEngine)
+static QObject *managerSingletonProvider(QQmlEngine *engine, QJSEngine *scriptEngine)
 {
     QQmlEngine::setObjectOwnership(WorldManager::instance(), QQmlEngine::CppOwnership);
     return WorldManager::instance();
@@ -57,7 +57,7 @@ static QObject* managerSingletonProvider(QQmlEngine *engine, QJSEngine *scriptEn
 void bindWorldTypes(QJSEngine *script, QQmlEngine *qml)
 {
     script->globalObject().setProperty("World", script->newQObject(WorldManager::instance()));
-
+    // @uri OpenSR.World
     qmlRegisterSingletonType<WorldManager>("OpenSR.World", 1, 0, "WorldManager", managerSingletonProvider);
     WorldObject::registerType<WorldObject>(qml, script);
     WorldObject::registerType<WorldContext>(qml, script);

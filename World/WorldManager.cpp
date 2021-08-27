@@ -426,6 +426,7 @@ void WorldManager::generateWorld(const QString& genScriptUrl)
     emit(contextChanged());
 }
 
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, ShipStyle)
 WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, RaceStyle)
 WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, PlanetarySystemStyle)
 WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, AsteroidStyle)

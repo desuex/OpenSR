@@ -211,11 +211,15 @@ LIBRANGER_API QByteArray unpackZL(QByteArray &src);
 LIBRANGER_API QByteArray packZL01(const QByteArray &src);
 LIBRANGER_API QByteArray packZL02(const QByteArray &src);
 
+LIBRANGER_API void readRAWTree(QIODevice *dev, QVariantMap *parent, bool isCache = false);
 LIBRANGER_API void readDATTree(QIODevice *dev, QVariantMap *parent, bool isCache = false);
 LIBRANGER_API QVariantMap loadDAT(QIODevice *dev, bool isCache = false);
 
 LIBRANGER_API void writeDATTree(QIODevice *dev, const QVariant& node, const QString& name);
 LIBRANGER_API void saveDAT(QIODevice *dev, const QVariant& root);
+
+LIBRANGER_API QVariantMap loadRAW(QIODevice *dev, bool isCache = false);
+LIBRANGER_API void saveRAW(QIODevice *dev, const QVariant& root);
 }
 
 #endif
