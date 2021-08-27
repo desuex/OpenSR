@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,79 +17,175 @@
 */
 
 #include "WorldObject.h"
-#include "WorldHelper.h"
 #include "WorldManager.h"
 
-namespace
-{
-const uint32_t WORLD_OBJECT_SIGNATURE = *((uint32_t*)"SRWO");
-}
+#include <QtQml>
 
-namespace Rangers
+namespace OpenSR
 {
 namespace World
 {
-WorldObject::WorldObject(uint64_t id): m_objectID(id)
+const quint32 WorldObject::m_staticTypeId = typeIdFromClassName(WorldObject::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<WorldObject>(QQmlEngine *qml, QJSEngine *script)
 {
-    if (!id)
-        m_objectID = WorldManager::getNextId();
+    qmlRegisterType<WorldObject>("OpenSR.World", 1, 0, "WorldObject");
 }
 
-bool WorldObject::deserialize(std::istream& stream)
+template<>
+WorldObject* WorldObject::createObject(WorldObject *parent, quint32 id)
 {
-    uint32_t classType;
-    uint32_t sig;
-    stream.read((char *)&sig, 4);
-    if (sig != WORLD_OBJECT_SIGNATURE)
-        return false;
+    return new WorldObject(parent, id);
+}
 
-    stream.read((char *)&classType, 4);
-    if (classType != type())
-        return false;
+template<>
+quint32 WorldObject::staticTypeId<WorldObject>()
+{
+    return WorldObject::m_staticTypeId;
+}
 
-    stream.read((char *)&m_objectID, 8);
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<WorldObject>()
+{
+    return &WorldObject::staticMetaObject;
+}
 
-    if (!stream.good())
-        return false;
+WorldObject::WorldObject(WorldObject *parent, quint32 id): QObject(parent),
+    m_id(id)
+{
+    if (!m_id)
+        m_id = WorldManager::instance()->getNextId();
+}
+
+WorldObject::~WorldObject()
+{
+}
+
+quint32 WorldObject::id() const
+{
+    return m_id;
+}
+
+quint32 WorldObject::typeId() const
+{
+    return WorldObject::m_staticTypeId;
+}
+
+QString WorldObject::name() const
+{
+    return m_name;
+}
+
+QString WorldObject::namePrefix() const
+{
+    return tr("Object");
+}
+
+void WorldObject::setName(const QString& name)
+{
+    if (m_name != name)
+    {
+        m_name = name;
+        emit(nameChanged());
+    }
+}
+
+static QObject* childrenAtF(QQmlListProperty<QObject> *property, int index)
+{
+    return property->object->children().at(index);
+}
+
+static int childrenCountF(QQmlListProperty<QObject> *property)
+{
+    return property->object->children().count();
+}
+
+QQmlListProperty<QObject> WorldObject::getChildren()
+{
+    return QQmlListProperty<QObject>(this, 0, childrenCountF, childrenAtF);
+}
+
+void WorldObject::prepareSave()
+{
+}
+
+bool WorldObject::save(QDataStream &stream) const
+{
     return true;
 }
 
-uint64_t WorldObject::id() const
+bool WorldObject::load(QDataStream &stream, const QMap<quint32, WorldObject*>& objects)
 {
-    return m_objectID;
-}
-
-bool WorldObject::serialize(std::ostream& stream) const
-{
-    uint32_t classType = type();
-    stream.write((const char *)&WORLD_OBJECT_SIGNATURE, 4);
-    stream.write((const char *)&classType, 4);
-    stream.write((const char *)&m_objectID, 8);
-    if (!stream.good())
-        return false;
     return true;
 }
 
-std::list<uint64_t> WorldObject::dependencies()
+/*!
+ * \brief start next turn.
+ * This function is called when next turn is requested.
+ * Object must calculate all future action in turn.
+ * \note All subclasses must call startTurn() from super-class.
+ */
+void WorldObject::startTurn()
 {
-    return std::list<uint64_t>();
+    for (auto o : children())
+    {
+        WorldObject *wo = qobject_cast<WorldObject*>(o);
+        if (wo)
+            wo->startTurn();
+    }
 }
 
-uint32_t WorldObject::type() const
+/*!
+ * \brief process turn.
+ * \param time - turn time, from 0.0f to 1.0f
+ * This function is called during turn animation.
+ * Normally, this function is called only for objects visible by player.
+ * Object must "play" planned actions.
+ * \note All subclasses must call processTurn() from super-class.
+ */
+void WorldObject::processTurn(float time)
 {
-    return WorldHelper::TYPE_WORLDOBJECT;
+    for (auto o : children())
+    {
+        WorldObject *wo = qobject_cast<WorldObject*>(o);
+        if (wo)
+            wo->processTurn(time);
+    }
 }
-
-void WorldObject::calcTurn()
-{
-}
-
-void WorldObject::turn(float progress)
-{
-}
-
+/*!
+ * \brief finsh turn.
+ * This function is called when turn is finished.
+ * Object must complete all actions planned for turn.
+ * \note All subclasses must call finishTurn() from super-class.
+ */
 void WorldObject::finishTurn()
 {
+    for (auto o : children())
+    {
+        WorldObject *wo = qobject_cast<WorldObject*>(o);
+        if (wo)
+            wo->finishTurn();
+    }
+}
+
+/*!
+ * \brief Generate type ID from class name
+ * \param className class name (usually, metaObject()->className)
+ * \return type ID for class
+ */
+quint32 WorldObject::typeIdFromClassName(const QString& className)
+{
+    quint32 h = 0;
+    int n = className.length();
+
+    while (n--)
+    {
+        h = (h << 4) + className[n].unicode();
+        h ^= (h & 0xf0000000) >> 23;
+        h &= 0x0fffffff;
+    }
+    return h;
 }
 }
 }

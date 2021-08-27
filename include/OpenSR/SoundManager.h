@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 - 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 - 2017 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,34 +16,56 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RANGERS_SOUNDMANAGER_H
-#define RANGERS_SOUNDMANAGER_H
+#ifndef OPENSR_SOUNDMANAGER_H
+#define OPENSR_SOUNDMANAGER_H
 
-#include "OpenSR/config.h"
+#include <OpenSR/OpenSR.h>
+#include <OpenAL/al.h>
 
-#include <boost/shared_ptr.hpp>
-#include <map>
-#include <SDL_mixer.h>
+#include <QObject>
+#include <QSharedPointer>
 
-namespace Rangers
+namespace OpenSR
 {
-class Sound;
-class RANGERS_ENGINE_API SoundManager
+class SoundManager;
+struct SampleData;
+class MusicDecoder;
+
+class Sample
 {
 public:
-    static SoundManager& instance();
+    Sample();
+    virtual ~Sample();
 
-    boost::shared_ptr<Sound> loadSound(const std::string& path);
-    void playMusic(const std::string& path, bool loop);
+    ALuint openALBufferID() const;
 
 private:
-    SoundManager();
-    SoundManager(const SoundManager& other);
+    Sample(QSharedPointer<SampleData> data);
+
+    QSharedPointer<SampleData> d;
+    friend class SoundManager;
+};
+
+class SoundManager : public QObject
+{
+    Q_OBJECT
+    OPENSR_DECLARE_PRIVATE(SoundManager)
+
+public:
+    SoundManager(QObject *parent = 0);
     virtual ~SoundManager();
 
-    std::map<std::string, boost::shared_ptr<Sound> > m_soundCache;
-    Mix_Music *m_currentMusic;
+    Sample loadSample(const QUrl& url);
+    void start();
+
+    MusicDecoder *getMusicDecoder(const QUrl& url, QObject *parent = 0);
+
+protected:
+    OPENSR_DECLARE_DPOINTER(SoundManager)
+
+private:
+    Q_DISABLE_COPY(SoundManager)
 };
 }
 
-#endif // RANGERS_SOUNDMANAGER_H
+#endif // OPENSR_SOUNDMANAGER_H

@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 - 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,194 +17,152 @@
 */
 
 #include "PlanetarySystem.h"
+#include "ResourceManager.h"
 
-#include "WorldHelper.h"
-#include "WorldManager.h"
+#include <QtQml>
 
-#include <OpenSR/libRanger.h>
-
-namespace Rangers
+namespace OpenSR
 {
 namespace World
 {
-PlanetarySystem::PlanetarySystem(uint64_t id) : WorldObject(id)
+const quint32 PlanetarySystem::m_staticTypeId = typeIdFromClassName(PlanetarySystem::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<PlanetarySystem>(QQmlEngine *qml, QJSEngine *script)
 {
-    m_position.x = 0.0f;
-    m_position.y = 0.0f;
-    m_size = 0.0f;
-    m_background = 0;
-    m_style = 0;
+    qRegisterMetaType<PlanetarySystemStyle::Data>();
+    qRegisterMetaTypeStreamOperators<PlanetarySystemStyle::Data>();
+    qRegisterMetaType<PlanetarySystemStyle>();
+    qRegisterMetaTypeStreamOperators<PlanetarySystemStyle>();
+    qmlRegisterType<PlanetarySystem>("OpenSR.World", 1, 0, "PlanetarySystem");
 }
 
-bool PlanetarySystem::deserialize(std::istream& stream)
+template<>
+PlanetarySystem* WorldObject::createObject(WorldObject *parent, quint32 id)
 {
-    if (!WorldObject::deserialize(stream))
-        return false;
-
-    uint32_t nameLength;
-    uint32_t objectCount;
-
-    stream.read((char *)&m_position, sizeof(Point));
-    if (!WorldHelper::deserializeString(m_name, stream))
-        return false;
-
-    stream.read((char *)&m_size, sizeof(float));
-    stream.read((char *)&m_style, sizeof(uint32_t));
-    stream.read((char *)&m_background, sizeof(uint32_t));
-
-    stream.read((char *)&objectCount, sizeof(uint32_t));
-    if (!stream.good())
-        return false;
-
-    for (int i = 0; i < objectCount; i++)
-    {
-        uint64_t id;
-        stream.read((char *)&id, sizeof(uint64_t));
-
-        boost::shared_ptr<SystemObject> object = boost::static_pointer_cast<SystemObject>(WorldManager::instance().getObject(id));
-        addObject(object);
-
-        if (!object)
-            return false;
-
-        if (!stream.good())
-            return false;
-    }
-
-    return true;
+    return new PlanetarySystem(parent, id);
 }
 
-std::string PlanetarySystem::name() const
+template<>
+quint32 WorldObject::staticTypeId<PlanetarySystem>()
 {
-    return m_name;
+    return PlanetarySystem::m_staticTypeId;
 }
 
-Point PlanetarySystem::position() const
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<PlanetarySystem>()
 {
-    return m_position;
+    return &PlanetarySystem::staticMetaObject;
 }
 
-bool PlanetarySystem::serialize(std::ostream& stream) const
+QString PlanetarySystemStyle::background() const
 {
-    if (!WorldObject::serialize(stream))
-        return false;
-
-    uint32_t nameLength = m_name.length();
-    uint32_t objectCount = m_systemObjects.size();
-
-    stream.write((const char *)&m_position, sizeof(Point));
-
-    if (!WorldHelper::serializeString(m_name, stream))
-        return false;
-
-    stream.write((const char *)&m_size, sizeof(float));
-    stream.write((const char *)&m_style, sizeof(uint32_t));
-    stream.write((const char *)&m_background, sizeof(uint32_t));
-
-    stream.write((const char *)&objectCount, sizeof(uint32_t));
-
-    std::list<boost::shared_ptr<SystemObject> >::const_iterator end = m_systemObjects.end();
-    for (std::list<boost::shared_ptr<SystemObject> >::const_iterator i = m_systemObjects.begin(); i != end; ++i)
-    {
-        uint64_t id = (*i)->id();
-        stream.write((const char *)&id, sizeof(uint64_t));
-    }
-
-    if (!stream.good())
-        return false;
-
-    return true;
+    return getData<Data>().background;
 }
 
-float PlanetarySystem::size() const
+QString PlanetarySystemStyle::star() const
 {
-    return m_size;
+    return getData<Data>().star;
 }
 
-std::list< boost::shared_ptr<SystemObject> > PlanetarySystem::systemObjects() const
+QColor PlanetarySystemStyle::starColor() const
 {
-    return m_systemObjects;
+    return getData<Data>().starColor;
 }
 
-uint32_t PlanetarySystem::type() const
+void PlanetarySystemStyle::setBackground(const QString& bg)
 {
-    return WorldHelper::TYPE_PLANETARYSYSTEM;
+    Data d = getData<Data>();
+    d.background = bg;
+    setData(d);
 }
 
-std::list< uint64_t > PlanetarySystem::dependencies()
+void PlanetarySystemStyle::setStar(QString& star)
 {
-    std::list<uint64_t> objectlist = WorldObject::dependencies();
-    std::list<boost::shared_ptr<SystemObject> >::const_iterator end = m_systemObjects.end();
-    for (std::list< boost::shared_ptr<SystemObject> >::const_iterator i = m_systemObjects.begin(); i != end; ++i)
-    {
-        objectlist.push_back((*i)->id());
-    }
-    return objectlist;
+    Data d = getData<Data>();
+    d.star = star;
+    setData(d);
 }
 
-void PlanetarySystem::addObject(boost::shared_ptr<SystemObject> object)
+void PlanetarySystemStyle::setStarColor(const QColor& color)
 {
-    m_systemObjects.push_back(object);
+    Data d = getData<Data>();
+    d.starColor = color;
+    setData(d);
 }
 
-void PlanetarySystem::removeObject(boost::shared_ptr<SystemObject> object)
+QDataStream& operator<<(QDataStream & stream, const PlanetarySystemStyle& style)
 {
-    m_systemObjects.remove(object);
+    return stream << style.id();
 }
 
-void PlanetarySystem::setName(const std::string& name)
+QDataStream& operator>>(QDataStream & stream, PlanetarySystemStyle& style)
 {
-    m_name = name;
+    quint32 id;
+    stream >> id;
+    ResourceManager *m = ResourceManager::instance();
+    Q_ASSERT(m != 0);
+    Resource::replaceData(style, m->getResource(id));
+    return stream;
 }
 
-void PlanetarySystem::setPosition(const Point& point)
+QDataStream& operator<<(QDataStream & stream, const PlanetarySystemStyle::Data& data)
 {
-    m_position = point;
+    return stream << data.background << data.star << data.starColor;
 }
 
-void PlanetarySystem::setSize(float size)
+QDataStream& operator>>(QDataStream & stream, PlanetarySystemStyle::Data& data)
 {
-    m_size = size;
+    return stream >> data.background >> data.star >> data.starColor;
 }
 
-void PlanetarySystem::turn(float progress)
+PlanetarySystem::PlanetarySystem(WorldObject *parent, quint32 id): WorldObject(parent, id)
 {
-    std::list<boost::shared_ptr<SystemObject> >::const_iterator end = m_systemObjects.end();
-    for (std::list< boost::shared_ptr<SystemObject> >::const_iterator i = m_systemObjects.begin(); i != end; ++i)
-    {
-        (*i)->turn(progress);
-    }
 }
 
-void PlanetarySystem::setStyle(uint32_t style)
+PlanetarySystem::~PlanetarySystem()
 {
-    m_style = style;
 }
 
-void PlanetarySystem::setStyle(const std::string& style)
+quint32 PlanetarySystem::typeId() const
 {
-    m_style = textHash32(style);
+    return PlanetarySystem::m_staticTypeId;
 }
 
-uint32_t PlanetarySystem::style() const
+QString PlanetarySystem::namePrefix() const
+{
+    return tr("System");
+}
+
+PlanetarySystemStyle PlanetarySystem::style() const
 {
     return m_style;
 }
 
-uint32_t PlanetarySystem::background() const
+int PlanetarySystem::size() const
 {
-    return m_background;
+    return m_size;
 }
 
-void PlanetarySystem::setBackground(const std::string& bg)
+void PlanetarySystem::setStyle(const PlanetarySystemStyle& style)
 {
-    m_background = textHash32(bg);
+    m_style = style;
+    emit(styleChanged());
 }
 
-void PlanetarySystem::setBackground(uint32_t bg)
+void PlanetarySystem::setSize(int size)
 {
-    m_background = bg;
+    if (m_size != size)
+    {
+        m_size = size;
+        emit(sizeChanged());
+    }
 }
 
+void PlanetarySystem::prepareSave()
+{
+    WorldObject::prepareSave();
+    m_style.registerResource();
+}
 }
 }

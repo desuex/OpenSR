@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 - 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,28 +16,45 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RANGERS_SOUND_H
-#define RANGERS_SOUND_H
+#ifndef OPENSR_SOUND_H
+#define OPENSR_SOUND_H
 
-#include "OpenSR/config.h"
+#include <OpenSR/OpenSR.h>
+#include <OpenSR/SoundManager.h>
+#include <QObject>
+#include <QUrl>
 
-#include <string>
-#include <boost/shared_ptr.hpp>
-
-struct Mix_Chunk;
-namespace Rangers
+namespace OpenSR
 {
-class RANGERS_ENGINE_API Sound
+class ENGINE_API Sound: public QObject
 {
+    Q_OBJECT
+    Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
+    Q_PROPERTY(float volume READ volume WRITE setVolume NOTIFY volumeChanged)
+
 public:
-    Sound();
-    Sound(const std::string& path);
+    Sound(QObject *parent = 0);
+    virtual ~Sound();
 
+    QUrl source() const;
+    float volume() const;
+
+    void setSource(const QUrl& source);
+    void setVolume(float volume);
+
+public Q_SLOTS:
     void play();
 
+Q_SIGNALS:
+    void sourceChanged();
+    void volumeChanged();
+
 private:
-    boost::shared_ptr<Mix_Chunk> m_chunk;
+    QUrl m_source;
+    Sample m_sample;
+    ALuint m_alSource;
+    float m_volume;
 };
 }
 
-#endif // RANGERS_SOUND_H
+#endif // OPENSR_SOUND_H

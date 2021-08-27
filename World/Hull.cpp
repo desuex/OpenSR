@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,29 +17,55 @@
 */
 
 #include "Hull.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Hull::Hull(uint64_t id): Equipment(id)
+const quint32 Hull::m_staticTypeId = typeIdFromClassName(Hull::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Hull>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Hull>("OpenSR.World", 1, 0, "Hull");
+}
+
+template<>
+Hull* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Hull(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Hull>()
+{
+    return Hull::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Hull>()
+{
+    return &Hull::staticMetaObject;
+}
+
+Hull::Hull(WorldObject *parent, quint32 id): Equipment(parent, id)
 {
 }
 
-bool Hull::deserialize(std::istream& stream)
+Hull::~Hull()
 {
-    return Equipment::deserialize(stream);
 }
 
-bool Hull::serialize(std::ostream& stream) const
+quint32 Hull::typeId() const
 {
-    return Equipment::serialize(stream);
+    return Hull::m_staticTypeId;
 }
 
-uint32_t Hull::type() const
+QString Hull::namePrefix() const
 {
-    return WorldHelper::TYPE_HULL;
+    return tr("Hull");
 }
 }
 }

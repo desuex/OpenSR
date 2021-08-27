@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 - 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,235 +16,53 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "OpenSR/libRanger.h"
+#include <OpenSR/libRangerQt.h>
 
-#include <zlib.h>
+#include <QByteArray>
+#include <QtEndian>
 #include <cstdlib>
 
-namespace
+namespace OpenSR
 {
-const uint32_t DEFAULT_ZLIB_CHUNK_SIZE = 256 * 1024;
-}
-
-namespace Rangers
-{
-//TODO: Normal error handling
-
 /*!
- * \param src ZL01 - compressed data
- * \param srclen input data size
- * \param destlen output data size
+ * \param src zlib compressed data
+ *   \note: This function has to convert second DWORD to big endian
  * \return unpacked data
  */
-unsigned char *unpackZL01(const unsigned char * src, size_t srclen, size_t& destlen)
+QByteArray unpackZL(QByteArray &src)
 {
-    uint32_t sig = ((uint32_t *)src)[0];
+    uint32_t sig = ((uint32_t *)src.constData())[0];
+    uint32_t outsize = ((uint32_t *)src.constData())[1];
 
-    if (sig != 0x31304c5a)
-    {
-        destlen = 0;
-        return 0;
-    }
+    if (sig != ZL02_SIGNATURE && sig != ZL01_SIGNATURE)
+        return QByteArray();
 
-    uLongf outsize = ((uint32_t *)src)[1];
+    ((uint32_t *)src.data())[1] = qToBigEndian(outsize);
 
-    const unsigned char *inbuffer = src + 8;
-    unsigned char *outbuffer = new unsigned char[outsize];
-
-    if (uncompress(outbuffer, &outsize, inbuffer, srclen - 8))
-    {
-        destlen = 0;
-        return 0;
-    }
-    else
-    {
-        destlen = outsize;
-        return outbuffer;
-    }
+    return qUncompress((const uchar*)(src.constData() + 4), src.size() - 4);
 }
 
-/*!
- * \param src input data
- * \param srclen input data size
- * \param destlen output data size
- * \return ZL01 - compressed data
- */
-unsigned char *packZL01(const unsigned char * src, size_t srclen, size_t& destlen)
+QByteArray packZL01(const QByteArray &src)
 {
-    uint32_t estSize = compressBound(srclen);
+    //TODO: Optimize
+    QByteArray compressed = qCompress(src);
+    QByteArray sigArr(4, 0);
 
-    unsigned char *result = new unsigned char[estSize + 8];
-    destlen = estSize;
-
-    if (compress(result + 8, &destlen, src, srclen))
-    {
-        delete[] result;
-        destlen = 0;
-        return 0;
-    }
-
-    ((uint32_t*)result)[0] = 0x31304c5a;
-    ((uint32_t*)result)[1] = srclen;
-    result = (unsigned char *)realloc(result, destlen + 8);
-    destlen += 8;
-    return result;
+    *((uint32_t *)sigArr.data()) = ZL01_SIGNATURE;
+    *((uint32_t *)compressed.data()) = qToLittleEndian((uint32_t)src.size());
+    compressed.prepend(sigArr);
+    return compressed;
 }
 
-/*!
- * \param dst Unpacked data buffer
- * \param src ZL02 - compressed data
- * \param srclen input data size
- * \param destlen output data size
- */
-void unpackZL02(unsigned char * dst, const unsigned char * src, size_t srclen, size_t& destlen)
+QByteArray packZL02(const QByteArray &src)
 {
-    uint32_t sig = ((uint32_t *)src)[0];
+    //TODO: Optimize
+    QByteArray compressed = qCompress(src);
+    QByteArray sigArr(4, 0);
 
-    if (sig != 0x32304c5a)
-    {
-        destlen = 0;
-        return;
-    }
-
-    uLongf outsize = destlen;
-
-    const unsigned char *inbuffer = src + 8;
-    unsigned char *outbuffer = dst;
-
-    if (uncompress(outbuffer, &outsize, inbuffer, srclen - 8))
-        destlen = 0;
-    else
-        destlen = outsize;
-}
-
-/*!
- * \param src ZL02 - compressed data
- * \param srclen input data size
- * \param destlen output data size
- * \return unpacked data
- */
-unsigned char *unpackZL02(const unsigned char * src, size_t srclen, size_t& destlen)
-{
-    uint32_t sig = ((uint32_t *)src)[0];
-
-    if (sig != 0x32304c5a)
-    {
-        destlen = 0;
-        return 0;
-    }
-
-    uLongf outsize = destlen;
-
-    const unsigned char *inbuffer = src + 8;
-    unsigned char *outbuffer = new unsigned char[outsize];
-
-    if (uncompress(outbuffer, &outsize, inbuffer, srclen - 8))
-    {
-        destlen = 0;
-        return 0;
-    }
-    else
-    {
-        destlen = outsize;
-        return outbuffer;
-    }
-}
-
-/*!
- * \param src input data
- * \param srclen input data size
- * \return RPKG file item
- */
-bool packRSZL(const char * src, size_t srclen, RPKGItem &item)
-{
-    uint32_t outBufSize = (compressBound(DEFAULT_ZLIB_CHUNK_SIZE) + 8) * (srclen / DEFAULT_ZLIB_CHUNK_SIZE + 1);
-    char* outdata = new char[outBufSize];
-    uint32_t pos = 0;
-    int32_t chunkSize;
-
-    item.packType = *((const uint32_t*)"RSZL");
-    item.size = srclen;
-    item.chunkSize = DEFAULT_ZLIB_CHUNK_SIZE;
-
-    for (int i = 0; i < ((srclen - 1) / DEFAULT_ZLIB_CHUNK_SIZE + 1); i++)
-    {
-        chunkSize = (srclen - i * DEFAULT_ZLIB_CHUNK_SIZE) >= DEFAULT_ZLIB_CHUNK_SIZE ? DEFAULT_ZLIB_CHUNK_SIZE : (srclen - i * DEFAULT_ZLIB_CHUNK_SIZE);
-
-        long unsigned int destSize = outBufSize - pos - 8;
-
-        z_stream zlibStream;
-        zlibStream.next_in = (unsigned char *)(src + i * DEFAULT_ZLIB_CHUNK_SIZE);
-        zlibStream.avail_in = chunkSize;
-        zlibStream.next_out = (unsigned char*)(outdata + pos + 8);
-        zlibStream.avail_out = destSize;
-        zlibStream.zalloc = 0;
-        zlibStream.zfree = 0;
-
-        deflateInit(&zlibStream, Z_DEFAULT_COMPRESSION);
-        deflate(&zlibStream, Z_FINISH);
-        deflateEnd(&zlibStream);
-
-        *((uint32_t*)(outdata + pos)) = *((const uint32_t*)"SZLC");
-        *((uint32_t*)(outdata + pos + 4)) = zlibStream.total_out;
-        pos += zlibStream.total_out + 8;
-    }
-
-    item.packSize = pos;
-    item.data = (unsigned char*)realloc(outdata, pos);
-    if (!item.data)
-    {
-        delete[] outdata;
-        return false;
-    }
-    return true;
-}
-
-/*!
- * \param item input data
- * \return unpacked data
- */
-char *unpackRSZL(RPKGItem item)
-{
-    if (item.packType != *((uint32_t*)"RSZL"))
-        return 0;
-
-    char *data = new char[item.size];
-
-    uint32_t extracted = 0;
-    uint32_t pos = 0;
-
-    while (extracted < item.size)
-    {
-        unsigned char *p = item.data + pos;
-        uint32_t chunkSig = *((uint32_t*)p);
-        if (chunkSig != *((uint32_t*)"SZLC"))
-        {
-            delete[] data;
-            return 0;
-        }
-        uint32_t chunkSize = *((uint32_t*)(p + 4));
-        z_stream zlibStream;
-        zlibStream.next_in = p + 8;
-        zlibStream.avail_in = chunkSize;
-        zlibStream.next_out = (unsigned char*)(data + extracted);
-        zlibStream.avail_out = item.size - extracted;
-        zlibStream.zalloc = 0;
-        zlibStream.zfree = 0;
-
-        inflateInit(&zlibStream);
-        inflate(&zlibStream, Z_FINISH);
-
-        if (zlibStream.avail_in != 0)
-        {
-            delete[] data;
-            return 0;
-        }
-
-        inflateEnd(&zlibStream);
-        extracted = item.size - zlibStream.avail_out;
-        pos += chunkSize + 8;
-    }
-
-    return data;
+    *((uint32_t *)sigArr.data()) = ZL02_SIGNATURE;
+    *((uint32_t *)compressed.data()) = qToLittleEndian((uint32_t)src.size());
+    compressed.prepend(sigArr);
+    return compressed;
 }
 }

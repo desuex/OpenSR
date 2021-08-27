@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 - 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,90 +17,116 @@
 */
 
 #include "Asteroid.h"
-#include "WorldHelper.h"
-#include <OpenSR/libRanger.h>
-#include <OpenSR/Log.h>
-#include <cmath>
 
+#include "ResourceManager.h"
+
+#include <QtQml>
+
+namespace OpenSR
+{
+namespace World
+{
 namespace
 {
 const int ITERATION_COUNTS = 10;
 }
 
-namespace Rangers
+const quint32 Asteroid::m_staticTypeId = typeIdFromClassName(Asteroid::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Asteroid>(QQmlEngine *qml, QJSEngine *script)
 {
-namespace World
+    qRegisterMetaType<AsteroidStyle>();
+    qRegisterMetaTypeStreamOperators<AsteroidStyle>();
+    qRegisterMetaType<AsteroidStyle::Data>();
+    qRegisterMetaTypeStreamOperators<AsteroidStyle::Data>();
+    qmlRegisterType<Asteroid>("OpenSR.World", 1, 0, "Asteroid");
+}
+
+template<>
+Asteroid* WorldObject::createObject(WorldObject *parent, quint32 id)
 {
-Asteroid::Asteroid(uint64_t id): SystemObject(id),
-    m_a(0), m_b(0), m_period(0), m_angle(0), m_t(0), m_style(0), m_mineral(0),
-    m_speed(0)
+    return new Asteroid(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Asteroid>()
+{
+    return Asteroid::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Asteroid>()
+{
+    return &Asteroid::staticMetaObject;
+}
+
+QString AsteroidStyle::texture() const
+{
+    return getData<Data>().texture;
+}
+
+QColor AsteroidStyle::color() const
+{
+    return getData<Data>().color;
+}
+
+void AsteroidStyle::setTexture(const QString& texture)
+{
+    auto d = getData<Data>();
+    d.texture = texture;
+    setData(d);
+}
+
+void AsteroidStyle::setColor(const QColor& color)
+{
+    auto d = getData<Data>();
+    d.color = color;
+    setData(d);
+}
+
+QDataStream& operator<<(QDataStream & stream, const AsteroidStyle& style)
+{
+    return stream << style.id();
+}
+
+QDataStream& operator>>(QDataStream & stream, AsteroidStyle& style)
+{
+    quint32 id;
+    stream >> id;
+    ResourceManager *m = ResourceManager::instance();
+    Q_ASSERT(m != 0);
+    Resource::replaceData(style, m->getResource(id));
+    return stream;
+}
+
+QDataStream& operator<<(QDataStream & stream, const AsteroidStyle::Data& data)
+{
+    return stream << data.color << data.texture;
+}
+
+QDataStream& operator>>(QDataStream & stream, AsteroidStyle::Data& data)
+{
+    return stream >> data.color >> data.texture;
+}
+
+Asteroid::Asteroid(WorldObject *parent, quint32 id): SpaceObject(parent, id),
+    m_angle(0), m_period(0), m_time(0), m_speed(0)
 {
 }
 
-bool Asteroid::deserialize(std::istream& stream)
+Asteroid::~Asteroid()
 {
-    if (!SystemObject::deserialize(stream))
-        return false;
-
-    stream.read((char *)&m_style, sizeof(uint32_t));
-    stream.read((char *)&m_a, sizeof(float));
-    stream.read((char *)&m_b, sizeof(float));
-    stream.read((char *)&m_period, sizeof(float));
-    stream.read((char *)&m_angle, sizeof(float));
-    stream.read((char *)&m_t, sizeof(float));
-    stream.read((char *)&m_mineral, sizeof(float));
-
-    if (!stream.good())
-        return false;
-
-    calcEccentricity();
-    calcPosition();
-
-    return true;
 }
 
-float Asteroid::mineral() const
+AsteroidStyle Asteroid::style() const
 {
-    return m_mineral;
+    return m_style;
 }
 
-bool Asteroid::serialize(std::ostream& stream) const
+QPointF Asteroid::semiAxis() const
 {
-    if (!SystemObject::serialize(stream))
-        return false;
-
-    stream.write((char *)&m_style, sizeof(uint32_t));
-    stream.write((char *)&m_a, sizeof(float));
-    stream.write((char *)&m_b, sizeof(float));
-    stream.write((char *)&m_period, sizeof(float));
-    stream.write((char *)&m_angle, sizeof(float));
-    stream.write((char *)&m_t, sizeof(float));
-    stream.write((char *)&m_mineral, sizeof(float));
-
-    if (!stream.good())
-        return false;
-
-    return true;
-}
-
-void Asteroid::setMineral(float mineral)
-{
-    m_mineral = mineral;
-}
-
-float Asteroid::a() const
-{
-    return m_a;
-}
-
-float Asteroid::b() const
-{
-    return m_b;
-}
-
-float Asteroid::period() const
-{
-    return m_period;
+    return m_semiAxis;
 }
 
 float Asteroid::angle() const
@@ -108,75 +134,117 @@ float Asteroid::angle() const
     return m_angle;
 }
 
+float Asteroid::period() const
+{
+    return m_period;
+}
+
 float Asteroid::time() const
 {
-    return m_t;
+    return m_time;
 }
 
-void Asteroid::setSemiAxis(float a, float b)
+float Asteroid::speed() const
 {
-    if (a < b)
-    {
-        Log::warning() << "Asteroid: semi-major axis is less than semi-minor, axis will be swapped.";
-        m_a = b;
-        m_b = a;
-    }
-    else
-    {
-        m_a = a;
-        m_b = b;
-    }
-    calcEccentricity();
-    calcPosition();
-    calcSpeed();
-    calcTrajectory();
+    return m_speed;
 }
 
-void Asteroid::setPeriod(float T)
+void Asteroid::setStyle(const AsteroidStyle& style)
 {
-    m_period = T;
-    calcPosition();
-    calcSpeed();
-    calcTrajectory();
+    m_style = style;
+    emit(styleChanged());
+}
+
+void Asteroid::setSemiAxis(const QPointF& axis)
+{
+    if (axis != m_semiAxis)
+    {
+        if (axis.x() < axis.y())
+        {
+            qWarning() << "Asteroid: semi-major axis is less than semi-minor, axis will be swapped";
+            m_semiAxis.setX(axis.y());
+            m_semiAxis.setY(axis.x());
+        }
+        else
+            m_semiAxis = axis;
+
+        emit(semiAxisChanged());
+        calcEccentricity();
+        calcPosition();
+        calcSpeed();
+        updateTrajectory();
+    }
 }
 
 void Asteroid::setAngle(float angle)
 {
-    m_angle = angle;
-    calcPosition();
-    calcSpeed();
-    calcTrajectory();
+    if (angle != m_angle)
+    {
+        m_angle = angle;
+        emit(angleChanged());
+        calcPosition();
+        calcSpeed();
+        updateTrajectory();
+    }
+}
+
+void Asteroid::setPeriod(float period)
+{
+    if (period != m_period)
+    {
+        m_period = period;
+        emit(periodChanged());
+        calcPosition();
+        calcSpeed();
+        updateTrajectory();
+    }
 }
 
 void Asteroid::setTime(float time)
 {
-    m_t = time;
+    if (time != m_time)
+    {
+        m_time = time;
+        emit(timeChanged());
+        calcPosition();
+        calcSpeed();
+        updateTrajectory();
+    }
+}
 
-    if (fabs(m_t) > m_period)
-        m_t = fmod(m_t, m_period);
+quint32 Asteroid::typeId() const
+{
+    return Asteroid::m_staticTypeId;
+}
 
-    if (m_t < 0)
-        m_t = m_period + m_t;
+QString Asteroid::namePrefix() const
+{
+    return tr("Asteroid");
+}
 
-    calcPosition();
+void Asteroid::prepareSave()
+{
+    m_style.registerResource();
 }
 
 void Asteroid::calcEccentricity()
 {
-    m_e = sqrt(1 - (m_b * m_b) / (m_a * m_a));
+    m_e = sqrt(1 - (m_semiAxis.y() * m_semiAxis.y()) / (m_semiAxis.x() * m_semiAxis.x()));
 }
 
-void Asteroid::calcPosition()
+void Asteroid::calcPosition(float dt)
 {
-    m_position = E(solveKepler(m_t));
+    QPointF next = E(solveKepler(m_time + dt));
+    setPosition(next);
 }
 
-void Asteroid::calcSpeed()
+void Asteroid::calcSpeed(float dt)
 {
-    Point nextPos = E(solveKepler(m_t + 1));
-    float dx = nextPos.x - m_position.x;
-    float dy = nextPos.y - m_position.y;
+    QPointF nextPos = E(solveKepler(m_time + dt + 1.0f));
+    float dx = nextPos.x() - position().x();
+    float dy = nextPos.y() - position().y();
     m_speed = sqrt(dx * dx + dy * dy);
+    emit(speedChanged());
 }
 
 float Asteroid::solveKepler(float t)
@@ -185,39 +253,35 @@ float Asteroid::solveKepler(float t)
     float M = 2.0f * M_PI / m_period * t;
     float E = M;
     for (int j = 0; j < ITERATION_COUNTS; j++)
-    {
         E = m_e * sin(E) + M;
-    }
     return E;
 }
 
-Point Asteroid::E(float eta)
+QPointF Asteroid::E(float eta)
 {
-    Point p;
-    float angle = m_angle / 180.0f * M_PI;
-    p.x = - (m_a * m_e) * cos(angle) + m_a * cos(angle) * cos(eta) - m_b * sin(angle) * sin(eta);
-    p.y = - (m_a * m_e) * sin(angle) + m_a * sin(angle) * cos(eta) + m_b * cos(angle) * sin(eta);
+    QPointF p;
+    p.setX(-(m_semiAxis.x() * m_e) * cos(m_angle) + m_semiAxis.x() * cos(m_angle) * cos(eta) - m_semiAxis.y() * sin(m_angle) * sin(eta));
+    p.setY(-(m_semiAxis.x() * m_e) * sin(m_angle) + m_semiAxis.x() * sin(m_angle) * cos(eta) + m_semiAxis.y() * cos(m_angle) * sin(eta));
     return p;
 }
 
-Point Asteroid::Ederiv(float eta)
+QPointF Asteroid::Ederiv(float eta)
 {
-    Point p;
-    float angle = m_angle / 180.0f * M_PI;
-    p.x = - m_a * cos(angle) * sin(eta) - m_b * sin(angle) * cos(eta);
-    p.y = - m_a * sin(angle) * sin(eta) + m_b * cos(angle) * cos(eta);
+    QPointF p;
+    p.setX(- m_semiAxis.x() * cos(m_angle) * sin(eta) - m_semiAxis.y() * sin(m_angle) * cos(eta));
+    p.setY(- m_semiAxis.x() * sin(m_angle) * sin(eta) + m_semiAxis.y() * cos(m_angle) * cos(eta));
     return p;
 }
 
-void Asteroid::calcTrajectory()
+void Asteroid::updateTrajectory()
 {
-    m_trajectory.nextTurns.clear();
+    QList<BezierCurve> trajectory;
 
-    float prev = solveKepler(m_t);
+    float prev = solveKepler(m_time);
 
-    for (int i = 1; i < int(round(m_period / 2)); i++)
+    for (int i = 1; i < int(round(m_period)) + 1; i++)
     {
-        float t = m_t + i;
+        float t = m_time + i;
         if (fabs(t) > m_period)
             t = fmod(t, m_period);
 
@@ -226,71 +290,45 @@ void Asteroid::calcTrajectory()
 
         float eta = solveKepler(t);
 
-        Vector p1, p2, p3, p4;
-        Point p;
+        QPointF p;
+        BezierCurve c;
 
         // http://www.spaceroots.org/documents/ellipse/elliptical-arc.pdf
         p = E(prev);
-        p1 = Vector(p.x, p.y);
+        c.p0 = QPointF(p.x(), p.y());
         p = E(eta);
-        p4 = Vector(p.x, p.y);
+        c.p3 = QPointF(p.x(), p.y());
 
         float tangent = tan((eta - prev) / 2.0f);
         float k = sin(eta - prev) * (sqrt(4.0f + 3.0f * tangent * tangent) - 1.0f) / 3.0f;
 
         p = Ederiv(prev);
-        p2 = p1 + k * Vector(p.x, p.y);
+        c.p1 = c.p0 + k * QPointF(p.x(), p.y());
         p = Ederiv(eta);
-        p3 = p4 - k * Vector(p.x, p.y);
+        c.p2 = c.p3 - k * QPointF(p.x(), p.y());
 
-        BezierCurve c = BezierCurve(p1, p2, p3, p4);
-
-        m_trajectory.nextTurns.push_back(c);
+        trajectory.push_back(c);
 
         prev = eta;
     }
+    setTrajectory(trajectory);
 }
 
-float Asteroid::speed() const
+void Asteroid::startTurn()
 {
-    return m_speed;
+    SpaceObject::startTurn();
 }
 
-void Asteroid::calcTurn()
+void Asteroid::processTurn(float time)
 {
-    m_prevT = m_t;
+    calcPosition(time);
+    SpaceObject::processTurn(time);
 }
 
 void Asteroid::finishTurn()
 {
-    setTime(m_prevT + 1.0f);
-    calcTrajectory();
-    calcSpeed();
-}
-
-void Asteroid::turn(float progress)
-{
-    setTime(m_prevT + progress);
-}
-
-uint32_t Asteroid::style() const
-{
-    return m_style;
-}
-
-void Asteroid::setStyle(uint32_t style)
-{
-    m_style = style;
-}
-
-void Asteroid::setStyle(const std::string& style)
-{
-    setStyle(textHash32(style));
-}
-
-uint32_t Asteroid::type() const
-{
-    return WorldHelper::TYPE_ASTEROID;
+    setTime(m_time + 1.0);
+    SpaceObject::finishTurn();
 }
 }
 }

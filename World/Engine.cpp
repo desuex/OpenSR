@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,29 +17,55 @@
 */
 
 #include "Engine.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Engine::Engine(uint64_t id): Equipment(id)
+const quint32 Engine::m_staticTypeId = typeIdFromClassName(Engine::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Engine>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Engine>("OpenSR.World", 1, 0, "Engine");
+}
+
+template<>
+Engine* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Engine(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Engine>()
+{
+    return Engine::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Engine>()
+{
+    return &Engine::staticMetaObject;
+}
+
+Engine::Engine(WorldObject *parent, quint32 id): Equipment(parent, id)
 {
 }
 
-bool Engine::deserialize(std::istream& stream)
+Engine::~Engine()
 {
-    return Equipment::deserialize(stream);
 }
 
-bool Engine::serialize(std::ostream& stream) const
+quint32 Engine::typeId() const
 {
-    return Equipment::serialize(stream);
+    return Engine::m_staticTypeId;
 }
 
-uint32_t Engine::type() const
+QString Engine::namePrefix() const
 {
-    return WorldHelper::TYPE_ENGINE;
+    return tr("Engine");
 }
 }
 }

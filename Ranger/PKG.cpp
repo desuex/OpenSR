@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,15 +16,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "OpenSR/libRanger.h"
+#include <OpenSR/libRangerQt.h>
 
-#include <iomanip>
-#include <cstdlib>
-
-using namespace Rangers;
-
-using namespace std;
-
+namespace OpenSR
+{
 struct PKGDirHeader
 {
     uint32_t zero1;
@@ -32,11 +27,10 @@ struct PKGDirHeader
     uint32_t zero2;
 };
 
-PKGItem *loadItems(std::istream& stream, PKGItem *previous)
+PKGItem *loadItems(QIODevice *dev, PKGItem *previous)
 {
     uint32_t zero;
     PKGDirHeader dir;
-
 
     PKGItem *result = 0;
 
@@ -53,15 +47,10 @@ PKGItem *loadItems(std::istream& stream, PKGItem *previous)
         previous->offset = 4;
     }
 
-    stream.seekg(previous->offset, ios_base::beg);
-
-    stream.read((char*)&dir, sizeof(PKGDirHeader));
-
-    if (stream.eof() || stream.fail())
-        return result;
+    dev->seek(previous->offset);
+    dev->read((char*)&dir, sizeof(PKGDirHeader));
 
     previous->childCount = dir.itemsCount;
-
     previous->childs = new PKGItem[dir.itemsCount];
 
     for (int i = 0; i < dir.itemsCount; i++)
@@ -71,23 +60,23 @@ PKGItem *loadItems(std::istream& stream, PKGItem *previous)
         item.childCount = 0;
         item.childs = 0;
 
-        stream.seekg(previous->offset + 12 + 158 * i, ios_base::beg);
+        dev->seek(previous->offset + 12 + 158 * i);
 
-        stream.read((char*)&item.sizeInArc, 4);
-        stream.read((char*)&item.size, 4);
-        stream.read((char*)item.fullName, 63);
-        stream.read((char*)item.name, 63);
-        stream.read((char*)&item.dataType, 4);
-        stream.read((char*)&zero, 4);
-        stream.read((char*)&zero, 4);
-        stream.read((char*)&zero, 4);
-        stream.read((char*)&item.offset, 4);
-        stream.read((char*)&zero, 4);
+        dev->read((char*)&item.sizeInArc, 4);
+        dev->read((char*)&item.size, 4);
+        dev->read((char*)item.fullName, 63);
+        dev->read((char*)item.name, 63);
+        dev->read((char*)&item.dataType, 4);
+        dev->read((char*)&zero, 4);
+        dev->read((char*)&zero, 4);
+        dev->read((char*)&zero, 4);
+        dev->read((char*)&item.offset, 4);
+        dev->read((char*)&zero, 4);
 
         previous->childs[i] = item;
 
         if (item.dataType == 3)
-            loadItems(stream, &previous->childs[i]);
+            loadItems(dev, &previous->childs[i]);
     }
 
     return result;
@@ -98,68 +87,55 @@ PKGItem *loadItems(std::istream& stream, PKGItem *previous)
  * \param pkgfile archive file
  * \return loaded data
  */
-unsigned char *Rangers::extractFile(const PKGItem &item, std::istream& pkgfile)
+QByteArray extractFile(const PKGItem &item, QIODevice *dev)
 {
     if (item.dataType == 3)
-        return 0;
+        return QByteArray();
+
+    QByteArray result;
 
     if (item.dataType == 2)
     {
-        size_t outsize = item.size;
-        size_t buffer_size;
-        size_t done = 0;
-        pkgfile.seekg(item.offset + 4, ios_base::beg);
+        uint32_t outsize = item.size;
+        uint32_t bufsize;
+        uint32_t done = 0;
+        dev->seek(item.offset + 4);
 
-        unsigned char *inputbuffer = 0;
-        unsigned char *outbuffer = new unsigned char[outsize];
-
-        while ((done < item.size) && outsize)
+        while (done < outsize)
         {
-            buffer_size = 0;
-            pkgfile.read((char *)&buffer_size, 4);
-            unsigned char *inp = (unsigned char *)realloc(inputbuffer, buffer_size);
-            if (!inp)
-            {
-                delete inputbuffer;
-                return 0;
-            }
-            else
-            {
-                inputbuffer = inp;
-            }
-            pkgfile.read((char *)inputbuffer, buffer_size);
-            unpackZL02(outbuffer + done, inputbuffer, buffer_size, outsize);
-            done += outsize;
+            uint32_t bufsize;
+            dev->read((char *)&bufsize, 4);
+            QByteArray d = dev->read(bufsize);
+            QByteArray r = unpackZL(d);
+            result += r;
+            done += r.size();
         }
 
-        delete inputbuffer;
-
-        return outbuffer;
+        return result;
     }
 
     if (item.dataType == 1)
     {
-        pkgfile.seekg(item.offset + 4, ios_base::beg);
-        unsigned char *outbuffer = new unsigned char[item.size];
-        pkgfile.read((char *)outbuffer, item.size);
-        return outbuffer;
+        dev->seek(item.offset + 4);
+        return dev->read(item.size);
     }
 
-    return 0;
+    return QByteArray();
 }
 
 /*!
  * \param stream input stream
  * \return pointer to root item
  */
-PKGItem *Rangers::loadPKG(std::istream& stream)
+PKGItem *loadPKG(QIODevice *dev)
 {
     uint32_t offset;
     uint32_t zero;
-    stream.read((char*)&offset, sizeof(uint32_t));
-    stream.seekg(offset, ios_base::beg);
+    dev->read((char*)&offset, sizeof(uint32_t));
+    dev->seek(offset);
 
-    PKGItem *root = loadItems(stream, 0);
+    PKGItem *root = loadItems(dev, 0);
 
     return root;
+}
 }

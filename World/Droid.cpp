@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,29 +17,55 @@
 */
 
 #include "Droid.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Droid::Droid(uint64_t id): Equipment(id)
+const quint32 Droid::m_staticTypeId = typeIdFromClassName(Droid::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Droid>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Droid>("OpenSR.World", 1, 0, "Droid");
+}
+
+template<>
+Droid* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Droid(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Droid>()
+{
+    return Droid::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Droid>()
+{
+    return &Droid::staticMetaObject;
+}
+
+Droid::Droid(WorldObject *parent, quint32 id): Equipment(parent, id)
 {
 }
 
-bool Droid::deserialize(std::istream& stream)
+Droid::~Droid()
 {
-    return Equipment::deserialize(stream);
 }
 
-bool Droid::serialize(std::ostream& stream) const
+quint32 Droid::typeId() const
 {
-    return Equipment::serialize(stream);
+    return Droid::m_staticTypeId;
 }
 
-uint32_t Droid::type() const
+QString Droid::namePrefix() const
 {
-    return WorldHelper::TYPE_DROID;
+    return tr("Droid");
 }
 }
 }

@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,44 +16,79 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "OpenSR/libRanger.h"
+#include <OpenSR/libRangerQt.h>
+#include <QBuffer>
 
-#include <cstring>
-
-using namespace Rangers;
-
-extern void blitABGRI(uint8_t *dest, int destwidth, int x, int y, int w, int h, const uint8_t *graphbuf, const uint8_t *pal);
-
-/*!
- * \param stream input file
- * \return HAI animation structure
- */
-HAIAnimation Rangers::loadHAIAnimation(std::istream& stream)
+namespace OpenSR
 {
-    HAIHeader header;
-    stream.read((char *)&header, sizeof(HAIHeader));
+extern void blitARGBI(QImage &result, int x, int y, int w, int h, QIODevice *dev);
 
-    int size = header.width * header.height;
+bool checkHAIHeader(QIODevice *dev)
+{
+    quint32 sig;
+    qint64 size = dev->peek((char*)&sig, sizeof(quint32));
 
-    unsigned char *buffer = new unsigned char[header.width * header.height + header.palSize];
-    unsigned char *rgba = new unsigned char[size * 4 * header.count];
+    if (size != sizeof(quint32) || sig != HAI_SIGNATURE)
+        return false;
 
-    unsigned char *outbuf = rgba;
+    return true;
+}
+
+QImage loadHAIFrame(QIODevice *dev, const HAIHeader& header, int i)
+{
+    if (i >= header.count)
+        return QImage();
+
+    QImage result(header.width, header.height, QImage::Format_Indexed8);
+    result.fill(0);
+
+    dev->seek(sizeof(HAIHeader) + i * (header.height * header.rowBytes + header.palSize));
+
+    blitARGBI(result, 0, 0, header.width, header.height, dev);
+
+    QVector<QRgb> pal(header.palSize / 4);
+    dev->read((char*)pal.data(), header.palSize);
+
+    //FIXME: Does color table really requires a premultiply?
+    for (int i = 0; i < header.palSize / 4; i++)
+        pal[i] = qPremultiply(qRgba(pal[i] & 0xFF, ((pal[i] >> 8) & 0xFF), ((pal[i] >> 16) & 0xFF), (pal[i] >> 24) & 0xFF));
+
+    result.setColorTable(pal);
+
+    return result;
+}
+
+Animation loadHAIAnimation(QIODevice *dev)
+{
+    if (!checkHAIHeader(dev))
+        return Animation();
+
+    HAIHeader header = readHAIHeader(dev);
+
+    Animation result;
+    result.images = QVector<QImage>(header.count);
+    result.times = QVector<int>(header.count, HAI_FRAME_TIME);
 
     for (int i = 0; i < header.count; i++)
     {
-        stream.read((char *)buffer, header.width * header.height + header.palSize);
-        blitABGRI(outbuf, header.width, 0, 0, header.width, header.height, buffer, buffer + size);
-        outbuf += size * 4;
+        result.images[i] = loadHAIFrame(dev, header, i);
     }
 
-    delete[] buffer;
-
-    HAIAnimation result;
-    result.frameCount = header.count;
-    result.frames = rgba;
-    result.width = header.width;
-    result.height = header.height;
-
     return result;
+}
+
+HAIHeader peekHAIHeader(QIODevice *dev)
+{
+    HAIHeader result;
+    dev->peek((char*)&result, sizeof(HAIHeader));
+    return result;
+}
+
+HAIHeader readHAIHeader(QIODevice *dev)
+{
+    HAIHeader result;
+    dev->read((char*)&result, sizeof(HAIHeader));
+    return result;
+}
+
 }

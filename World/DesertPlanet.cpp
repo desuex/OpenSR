@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,29 +17,55 @@
 */
 
 #include "DesertPlanet.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-DesertPlanet::DesertPlanet(uint64_t id): Planet(id)
+const quint32 DesertPlanet::m_staticTypeId = typeIdFromClassName(DesertPlanet::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<DesertPlanet>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<DesertPlanet>("OpenSR.World", 1, 0, "DesertPlanet");
+}
+
+template<>
+DesertPlanet* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new DesertPlanet(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<DesertPlanet>()
+{
+    return DesertPlanet::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<DesertPlanet>()
+{
+    return &DesertPlanet::staticMetaObject;
+}
+
+DesertPlanet::DesertPlanet(WorldObject *parent, quint32 id): Planet(parent, id)
 {
 }
 
-bool DesertPlanet::deserialize(std::istream& stream)
+DesertPlanet::~DesertPlanet()
 {
-    return Planet::deserialize(stream);
 }
 
-bool DesertPlanet::serialize(std::ostream& stream) const
+quint32 DesertPlanet::typeId() const
 {
-    return Planet::serialize(stream);
+    return DesertPlanet::m_staticTypeId;
 }
 
-uint32_t DesertPlanet::type() const
+QString DesertPlanet::namePrefix() const
 {
-    return WorldHelper::TYPE_DESERTPLANET;
+    return tr("Desert planet");
 }
 }
 }

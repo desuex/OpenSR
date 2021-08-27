@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,55 +17,55 @@
 */
 
 #include "Equipment.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Equipment::Equipment(uint64_t id): Item(id)
+const quint32 Equipment::m_staticTypeId = typeIdFromClassName(Equipment::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Equipment>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Equipment>("OpenSR.World", 1, 0, "Equipment");
+}
+
+template<>
+Equipment* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Equipment(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Equipment>()
+{
+    return Equipment::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Equipment>()
+{
+    return &Equipment::staticMetaObject;
+}
+
+Equipment::Equipment(WorldObject *parent, quint32 id): Item(parent, id)
 {
 }
 
-bool Equipment::deserialize(std::istream& stream)
+Equipment::~Equipment()
 {
-    if (!Item::deserialize(stream))
-        return false;
-
-    stream.read((char *)&m_race, sizeof(uint32_t));
-
-    if (!stream.good())
-        return false;
-
-    return true;
 }
 
-uint32_t Equipment::race() const
+quint32 Equipment::typeId() const
 {
-    return m_race;
+    return Equipment::m_staticTypeId;
 }
 
-bool Equipment::serialize(std::ostream& stream) const
+QString Equipment::namePrefix() const
 {
-    if (!Item::serialize(stream))
-        return false;
-
-    stream.write((const char *)&m_race, sizeof(uint32_t));
-
-    if (!stream.good())
-        return false;
-
-    return true;
-}
-
-uint32_t Equipment::type() const
-{
-    return WorldHelper::TYPE_EQUIPMENT;
-}
-
-void Equipment::setRace(uint32_t race)
-{
-    m_race = race;
+    return tr("Equipment");
 }
 }
 }

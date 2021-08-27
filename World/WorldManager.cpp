@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 - 2014 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,331 +17,448 @@
 */
 
 #include "WorldManager.h"
-#include "WorldObject.h"
-#include "PlanetarySystem.h"
-#include "WorldGenHook.h"
-#include "WorldHelper.h"
+
+#include <QHash>
+#include <QMap>
+#include <QFile>
+#include <QDebug>
+#include <QDataStream>
+#include <QMetaProperty>
+#include <QUrl>
+#include <QQmlEngine>
 
 #include <OpenSR/Engine.h>
 
-#include <fstream>
-#include <OpenSR/libRanger.h>
-#include <OpenSR/Log.h>
-#include <OpenSR/PythonBindings.h>
+#include "WorldObject.h"
+#include "WorldContext.h"
 
-namespace
-{
-const uint32_t SAVE_FILE_SIGNATURE = *((uint32_t*)"SRSF");
-}
-
-namespace Rangers
+namespace OpenSR
 {
 namespace World
 {
-uint64_t WorldManager::m_idCounter = 0;
-
-WorldManager::WorldManager()
+namespace
 {
-    m_skinManager.loadStyles();
+static QMap<quint32, const QMetaObject*> metaMap;
+const quint32 SAVE_FILE_SIGNATURE = 0x5352534F;
+const quint32 OBJECT_SIGNATURE = 0x4F575253;
+
+struct ObjectHeader
+{
+    quint32 type;
+    quint32 id;
+    QString idName;
+    quint32 parentId;
+};
+
+QDataStream& operator<<(QDataStream& stream, const ObjectHeader& h)
+{
+    return stream << h.type << h.id << h.idName << h.parentId;
 }
 
-WorldManager& WorldManager::instance()
+QDataStream& operator>>(QDataStream& stream, ObjectHeader& h)
 {
-    static WorldManager manager;
-    return manager;
+    return stream >> h.type >> h.id >> h.idName >> h.parentId;
 }
 
-void WorldManager::addObject(boost::shared_ptr<WorldObject> object)
+WorldObject* createObject(QMap<quint32, WorldObject*>& objects, QMap<quint32, ObjectHeader>& headers, const ObjectHeader& header)
 {
-    if (!object)
+    WorldObject *parent = 0;
+    headers.remove(header.id);
+    if (header.parentId)
+    {
+        auto p = objects.find(header.parentId);
+        if (p == objects.end())
+        {
+            auto ph = headers.find(header.parentId);
+            if (ph == headers.end())
+            {
+                qWarning() << "Inconsistent save file.";
+                return 0;
+            }
+            parent = createObject(objects, headers, *ph);
+        }
+        else
+            parent = *p;
+    }
+    auto metai = metaMap.find(header.type);
+    if (metai == metaMap.end())
+    {
+        qWarning() << "Unknow object in save file";
+        return 0;
+    }
+    const QMetaObject *meta = *metai;
+    WorldObject *obj = qobject_cast<WorldObject*>(meta->newInstance(Q_ARG(WorldObject*, parent), Q_ARG(quint32, header.id)));
+    obj->setObjectName(header.idName);
+    if (obj)
+        objects.insert(obj->id(), obj);
+    return obj;
+}
+
+bool writeObject(const WorldObject* object, QDataStream& stream)
+{
+    const QMetaObject *meta = object->metaObject();
+    for (int i = 0; i < meta->propertyCount(); ++i)
+    {
+        QMetaProperty p = meta->property(i);
+        //FIXME: Save property id?
+        if (p.isReadable() && p.isStored())
+            stream << p.read(object);
+
+        if (stream.status() != QDataStream::Ok)
+            return false;
+    }
+    return object->save(stream);
+}
+
+bool readObject(WorldObject* object, QDataStream& stream, const QMap<quint32, WorldObject*>& objects)
+{
+    const QMetaObject *meta = object->metaObject();
+    for (int i = 0; i < meta->propertyCount(); ++i)
+    {
+        QMetaProperty p = meta->property(i);
+        if (p.isWritable() && p.isStored())
+        {
+            QVariant value;
+            stream >> value;
+            p.write(object, value);
+        }
+
+        if (stream.status() != QDataStream::Ok)
+            return false;
+    }
+    return object->load(stream, objects);
+}
+
+void countObjects(QList<WorldObject*>& objects, WorldObject* current)
+{
+    if (!current)
         return;
-    m_objects[object->id()] = object;
-}
 
-void WorldManager::removeObject(boost::shared_ptr<WorldObject> object)
-{
-    std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator i = m_objects.find(object->id());
-    if (i != m_objects.end())
-        m_objects.erase(i);
-}
-void WorldManager::removeObject(uint64_t id)
-{
-    std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator i = m_objects.find(id);
-    if (i != m_objects.end())
-        m_objects.erase(i);
-}
-
-
-SkinManager& WorldManager::skinManager()
-{
-    return m_skinManager;
-}
-
-RaceManager& WorldManager::raceManager()
-{
-    return m_raceManager;
-}
-
-PlanetManager& WorldManager::planetManager()
-{
-    return m_planetManager;
-}
-
-void WorldManager::generateWorld()
-{
-    std::string worldRaces = Engine::instance().properties()->get<std::string>("world.races", "/world/races");
-    std::string worldSystemStyles = Engine::instance().properties()->get<std::string>("world.systemStyles", "/world/system-styles");
-    std::string worldPlanetStyles = Engine::instance().properties()->get<std::string>("world.planetStyles", "/world/planet-styles");
-    std::string worldAsteroidStyles = Engine::instance().properties()->get<std::string>("world.asteroidStyles", "/world/asteroid-styles");
-    std::string worldSystemBackgrounds = Engine::instance().properties()->get<std::string>("world.worldSystemBackgrounds", "/world/system-backgrounds");
-
-    if (!worldRaces.empty())
-        m_raceManager.loadRaces(worldRaces);
-
-    if (!worldSystemStyles.empty())
-        m_styleManager.loadSystemStyles(worldSystemStyles);
-
-    if (!worldPlanetStyles.empty())
-        m_styleManager.loadPlanetStyles(worldPlanetStyles);
-
-    if (!worldAsteroidStyles.empty())
-        m_styleManager.loadAsteroidStyles(worldAsteroidStyles);
-
-    if (!worldSystemBackgrounds.empty())
-        m_styleManager.loadSystemBackgrounds(worldSystemBackgrounds);
-
-    std::list<boost::shared_ptr<WorldGenHook> >::const_iterator end = m_genHooks.end();
-    for (std::list<boost::shared_ptr<WorldGenHook> >::const_iterator i = m_genHooks.begin(); i != end; ++i)
+    objects.push_back(current);
+    for (QObject* c : current->children())
     {
-        (*i)->generate();
+        WorldObject *o = qobject_cast<WorldObject*>(c);
+        if (!o)
+            continue;
+        countObjects(objects, o);
     }
 }
-
-bool WorldManager::saveWorld(const std::string& file) const
-{
-    std::map<uint64_t, boost::shared_ptr<WorldObject> > objects = m_objects;
-    std::list<boost::shared_ptr<WorldObject> > savingList;
-
-    while (!objects.empty())
-    {
-        boost::shared_ptr<WorldObject> object = (*objects.begin()).second;
-        getSavingList(object, savingList, objects);
-    }
-
-    std::ofstream worldFile;
-
-#if defined(WIN32) && defined(_MSC_VER)
-    worldFile.open(fromUTF8(file));
-#else
-    worldFile.open(file);
-#endif
-
-    worldFile.write((const char*)&SAVE_FILE_SIGNATURE, 4);
-
-    if (!worldFile.good())
-    {
-        Log::error() << "Cannot save world";
-        worldFile.close();
-        return false;
-    }
-
-    if (!m_planetManager.serialize(worldFile))
-    {
-        Log::error() << "Cannot save PlanetManager";
-        worldFile.close();
-        return false;
-    }
-
-    if (!m_systemManager.serialize(worldFile))
-    {
-        Log::error() << "Cannot save SystemManager";
-        worldFile.close();
-        return false;
-    }
-
-    if (!m_raceManager.serialize(worldFile))
-    {
-        Log::error() << "Cannot save RaceManager";
-        worldFile.close();
-        return false;
-    }
-
-    std::list<boost::shared_ptr<WorldObject> >::const_iterator end = savingList.end();
-    for (std::list<boost::shared_ptr<WorldObject> >::const_iterator i = savingList.begin(); i != end; ++i)
-    {
-        if (!(*i)->serialize(worldFile))
-        {
-            Log::error() << "Cannot save world objects";
-            worldFile.close();
-            return false;
-        }
-    }
-
-    worldFile.close();
-    return true;
 }
 
-
-bool WorldManager::loadWorld(const std::string& file)
+TurnAnimation::TurnAnimation(QObject *parent): QAbstractAnimation(parent)
 {
-    std::ifstream worldFile;
-
-#if defined(WIN32) && defined(_MSC_VER)
-    worldFile.open(fromUTF8(file));
-#else
-    worldFile.open(file);
-#endif
-
-    uint32_t sig;
-    worldFile.read((char*)&sig, 4);
-
-    if ((!worldFile.good()) || (sig != SAVE_FILE_SIGNATURE))
-    {
-        Log::error() << "Cannot load world";
-        worldFile.close();
-        return false;
-    }
-
-    if (!m_planetManager.deserialize(worldFile))
-    {
-        Log::error() << "Cannot load PlanetManager";
-        worldFile.close();
-        return false;
-    }
-
-    if (!m_systemManager.deserialize(worldFile))
-    {
-        Log::error() << "Cannot load SystemManager";
-        worldFile.close();
-        return false;
-    }
-
-    if (!m_raceManager.deserialize(worldFile))
-    {
-        Log::error() << "Cannot load RaceManager";
-        worldFile.close();
-        return false;
-    }
-
-    while (worldFile.good())
-    {
-        uint32_t classType;
-        //FIXME: Ugly
-        worldFile.seekg(4, std::ios_base::cur);
-        worldFile.read((char *)&classType, 4);
-        if (worldFile.eof())
-            break;
-        worldFile.seekg(-8, std::ios_base::cur);
-
-        if (!worldFile.good())
-        {
-            Log::error() << "Cannot load world objects.";
-            worldFile.close();
-            return false;
-        }
-
-        boost::shared_ptr<WorldObject> object = WorldHelper::createObjectByType(classType);
-        if ((!object) || (!object->deserialize(worldFile)))
-        {
-            Log::error() << "Cannot load world objects.";
-            worldFile.close();
-            return false;
-        }
-        addObject(object);
-        //FIXME: Quite ugly too.
-        if (object->type() == WorldHelper::TYPE_PLANETARYSYSTEM)
-        {
-            boost::shared_ptr<PlanetarySystem> system = boost::static_pointer_cast<PlanetarySystem>(object);
-            m_systemManager.addSystem(system);
-            //FIXME: Should save current system in some "game" context.
-            m_systemManager.setCurrentSystem(system);
-        }
-    }
-
-    worldFile.close();
-    return true;
 }
 
-void WorldManager::calcTurn()
+int	TurnAnimation::duration() const
 {
-    std::map<uint64_t, boost::shared_ptr<WorldObject> > objects = m_objects;
-    std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator end = objects.end();
-    for (std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator i = objects.begin(); i != end; ++i)
-    {
-        (*i).second->calcTurn();
-    }
+    return 2000;
+}
+
+void TurnAnimation::updateCurrentTime(int currentTime)
+{
+    if (state() != TurnAnimation::Running)
+        return;
+
+    WorldContext *ctx = WorldManager::instance()->context();
+    if (ctx && ctx->currentSystem())
+        ctx->currentSystem()->processTurn((float)currentTime / (float)duration());
+}
+
+WorldManager* WorldManager::m_staticInstance = 0;
+quint32 WorldManager::m_idPool = 0;
+
+WorldManager::WorldManager(QObject *parent): QObject(parent),
+    m_context(0)
+{
+    if (WorldManager::m_staticInstance)
+        throw std::runtime_error("WorldManager constructed twice");
+
+    WorldManager::m_staticInstance = this;
+
+    metaMap.insert(WorldObject::staticTypeId<World::WorldObject>(), WorldObject::staticTypeMeta<World::WorldObject>());
+    metaMap.insert(WorldObject::staticTypeId<World::WorldContext>(), WorldObject::staticTypeMeta<World::WorldContext>());
+    metaMap.insert(WorldObject::staticTypeId<World::Race>(), WorldObject::staticTypeMeta<World::Race>());
+    metaMap.insert(WorldObject::staticTypeId<World::Item>(), WorldObject::staticTypeMeta<World::Item>());
+    metaMap.insert(WorldObject::staticTypeId<World::Goods>(), WorldObject::staticTypeMeta<World::Goods>());
+    metaMap.insert(WorldObject::staticTypeId<World::Equipment>(), WorldObject::staticTypeMeta<World::Equipment>());
+    metaMap.insert(WorldObject::staticTypeId<World::Micromodulus>(), WorldObject::staticTypeMeta<World::Micromodulus>());
+    metaMap.insert(WorldObject::staticTypeId<World::Artefact>(), WorldObject::staticTypeMeta<World::Artefact>());
+    metaMap.insert(WorldObject::staticTypeId<World::Hull>(), WorldObject::staticTypeMeta<World::Hull>());
+    metaMap.insert(WorldObject::staticTypeId<World::Engine>(), WorldObject::staticTypeMeta<World::Engine>());
+    metaMap.insert(WorldObject::staticTypeId<World::Tank>(), WorldObject::staticTypeMeta<World::Tank>());
+    metaMap.insert(WorldObject::staticTypeId<World::Droid>(), WorldObject::staticTypeMeta<World::Droid>());
+    metaMap.insert(WorldObject::staticTypeId<World::CargoHook>(), WorldObject::staticTypeMeta<World::CargoHook>());
+    metaMap.insert(WorldObject::staticTypeId<World::DefenceGenerator>(), WorldObject::staticTypeMeta<World::DefenceGenerator>());
+    metaMap.insert(WorldObject::staticTypeId<World::Radar>(), WorldObject::staticTypeMeta<World::Radar>());
+    metaMap.insert(WorldObject::staticTypeId<World::Scanner>(), WorldObject::staticTypeMeta<World::Scanner>());
+    metaMap.insert(WorldObject::staticTypeId<World::Weapon>(), WorldObject::staticTypeMeta<World::Weapon>());
+    metaMap.insert(WorldObject::staticTypeId<World::Sector>(), WorldObject::staticTypeMeta<World::Sector>());
+    metaMap.insert(WorldObject::staticTypeId<World::PlanetarySystem>(), WorldObject::staticTypeMeta<World::PlanetarySystem>());
+    metaMap.insert(WorldObject::staticTypeId<World::SpaceObject>(), WorldObject::staticTypeMeta<World::SpaceObject>());
+    metaMap.insert(WorldObject::staticTypeId<World::Container>(), WorldObject::staticTypeMeta<World::Container>());
+    metaMap.insert(WorldObject::staticTypeId<World::Asteroid>(), WorldObject::staticTypeMeta<World::Asteroid>());
+    metaMap.insert(WorldObject::staticTypeId<World::Planet>(), WorldObject::staticTypeMeta<World::Planet>());
+    metaMap.insert(WorldObject::staticTypeId<World::MannedObject>(), WorldObject::staticTypeMeta<World::MannedObject>());
+    metaMap.insert(WorldObject::staticTypeId<World::InhabitedPlanet>(), WorldObject::staticTypeMeta<World::InhabitedPlanet>());
+    metaMap.insert(WorldObject::staticTypeId<World::DesertPlanet>(), WorldObject::staticTypeMeta<World::DesertPlanet>());
+    metaMap.insert(WorldObject::staticTypeId<World::Ship>(), WorldObject::staticTypeMeta<World::Ship>());
+    metaMap.insert(WorldObject::staticTypeId<World::SpaceStation>(), WorldObject::staticTypeMeta<World::SpaceStation>());
+    metaMap.insert(WorldObject::staticTypeId<World::ResourceManager>(), WorldObject::staticTypeMeta<World::ResourceManager>());
+
+    m_animation = new TurnAnimation(this);
+    connect(m_animation, SIGNAL(finished()), this, SLOT(finishTurn()));
+}
+
+QString WorldManager::typeName(quint32 type) const
+{
+    auto metai = metaMap.find(type);
+
+    if (metai == metaMap.end())
+        return QString();
+
+    return metai.value()->className();
+}
+
+WorldManager::~WorldManager()
+{
+    if (m_context)
+        delete m_context;
+    delete m_animation;
+    WorldManager::m_staticInstance = 0;
+}
+
+WorldContext* WorldManager::context() const
+{
+    return m_context;
+}
+
+WorldManager* WorldManager::instance()
+{
+    return WorldManager::m_staticInstance;
+}
+
+quint32 WorldManager::getNextId() const
+{
+    return ++WorldManager::m_idPool;
+}
+
+void WorldManager::startTurn()
+{
+    if (!m_context)
+        return;
+
+    if (m_animation->state() == TurnAnimation::Running)
+        return;
+
+    m_context->startTurn();
+
+    m_animation->setLoopCount(1);
+    m_animation->setCurrentTime(0);
+    m_animation->start();
 }
 
 void WorldManager::finishTurn()
 {
-    std::map<uint64_t, boost::shared_ptr<WorldObject> > objects = m_objects;
-    std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator end = objects.end();
-    for (std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator i = objects.begin(); i != end; ++i)
+    if (m_animation->state() == TurnAnimation::Running)
+        m_animation->stop();
+
+    m_context->finishTurn();
+}
+
+bool WorldManager::loadWorld(const QString& path)
+{
+    QFile f(path);
+    f.open(QIODevice::ReadOnly);
+
+    if (!f.isOpen())
     {
-        (*i).second->finishTurn();
+        qWarning().noquote() << QString("Cannot load save file \"%1\"").arg(path);
+        return false;
     }
-}
 
-uint64_t WorldManager::getNextId()
-{
-    return ++m_idCounter;
-}
+    QDataStream stream(&f);
 
-void WorldManager::getSavingList(boost::shared_ptr<WorldObject> object, std::list<boost::shared_ptr<WorldObject> >& list, std::map<uint64_t, boost::shared_ptr<WorldObject> >& remainingObjects) const
-{
-    if (!object)
-        return;
+    quint32 sig;
+    stream >> sig;
 
-    std::list<uint64_t> dependencies = object->dependencies();
-
-    std::list<uint64_t>::const_iterator end = dependencies.end();
-    for (std::list<uint64_t>::const_iterator i = dependencies.begin(); i != end; ++i)
+    if (sig != SAVE_FILE_SIGNATURE)
     {
-        std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator j = remainingObjects.find(*i);
-        if (j != remainingObjects.end())
+        qWarning().noquote() << QString("Cannot load save file \"%1\": not a save file.").arg(path);
+        return false;
+    }
+
+    QMap<quint32, WorldObject*> objects;
+    quint32 objectCount;
+    QMap<quint32, ObjectHeader> headersMap;
+
+    stream >> objectCount;
+
+    if (!objectCount)
+    {
+        qWarning() << "Invalid save file";
+        f.close();
+        return false;
+    }
+
+    if (m_context)
+        delete m_context;
+
+    ObjectHeader h;
+
+    // Context is always first
+    stream >> h;
+    m_context = qobject_cast<WorldContext*>(createObject(objects, headersMap, h));
+    m_context->setParent(this);
+    emit(contextChanged());
+
+    if (!m_context)
+    {
+        qWarning() << "Invalid save file";
+        f.close();
+        return false;
+    }
+
+    for (int i = 0; i < objectCount - 1; i++)
+    {
+        stream >> h;
+        headersMap[h.id] = h;
+    }
+
+    while (!headersMap.isEmpty())
+    {
+        ObjectHeader h = *(headersMap.begin());
+        WorldObject *o = createObject(objects, headersMap, h);
+        if (!o)
         {
-            getSavingList((*j).second, list, remainingObjects);
+            qWarning() << "Invalid save file";
+            f.close();
+            return false;
         }
     }
-    std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator i = remainingObjects.find(object->id());
-    if (i != remainingObjects.end())
+
+    for (int i = 0; i < objectCount; i++)
     {
-        list.push_back(object);
-        remainingObjects.erase(i);
+        quint32 sig, id;
+        stream >> sig;
+        if (sig != OBJECT_SIGNATURE)
+        {
+            qWarning() << "Invalid object in save file.";
+            f.close();
+            return false;
+        }
+        stream >> id;
+        auto oi = objects.find(id);
+        if (oi == objects.end() || !readObject(oi.value(), stream, objects))
+        {
+            qWarning() << "Invalid object in save file.";
+            f.close();
+            return false;
+        }
     }
+
+    f.close();
+    return true;
 }
 
-boost::shared_ptr<WorldObject> WorldManager::getObject(uint64_t id)
+bool WorldManager::saveWorld(const QString& path)
 {
-    std::map<uint64_t, boost::shared_ptr<WorldObject> >::iterator i = m_objects.find(id);
-    if (i != m_objects.end())
-        return (*i).second;
-    else
-        return boost::shared_ptr<WorldObject>();
+    QFile f(path);
+    f.open(QIODevice::WriteOnly);
+
+    if (!f.isOpen())
+    {
+        qWarning().noquote() << QString("Cannot open save file \"%1\": %2").arg(path, f.errorString());
+        return false;
+    }
+
+    QDataStream stream(&f);
+
+    QList<WorldObject*> objects;
+    countObjects(objects, m_context);
+
+    stream << SAVE_FILE_SIGNATURE;
+    stream << objects.count();
+
+    for (WorldObject* o : objects)
+    {
+        o->prepareSave();
+
+        ObjectHeader h;
+        h.id = o->id();
+        h.idName = o->objectName();
+        WorldObject *p = qobject_cast<WorldObject*>(o->parent());
+        if (p)
+            h.parentId = p->id();
+        else
+            h.parentId = 0;
+        h.type = o->typeId();
+
+        stream << h;
+    }
+
+    for (WorldObject* o : objects)
+    {
+        stream << OBJECT_SIGNATURE;
+        stream << o->id();
+        if (!writeObject(o, stream))
+        {
+            f.close();
+            return false;
+        }
+    }
+
+    f.close();
+    return true;
 }
 
-void WorldManager::addGenHook(boost::shared_ptr< WorldGenHook > hook)
+
+void WorldManager::generateWorld(const QString& genScriptUrl)
 {
-    if (!hook)
-        return;
-    m_genHooks.push_back(hook);
+    if (m_context)
+    {
+        delete m_context;
+        m_context = 0;
+    }
+
+    m_context = new WorldContext();
+    m_context->setParent(this);
+    qobject_cast<OpenSR::Engine*>(qApp)->execScript(genScriptUrl);
+    emit(contextChanged());
 }
 
-void WorldManager::removeGenHook(boost::shared_ptr< WorldGenHook > hook)
-{
-    if (!hook)
-        return;
-    m_genHooks.remove(hook);
-}
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, ShipStyle)
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, RaceStyle)
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, PlanetarySystemStyle)
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, AsteroidStyle)
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, PlanetStyle)
+WORLD_JS_DEFAULT_GADGET_CONSTRUCTOR(WorldManager, StationStyle)
 
-SystemManager& WorldManager::systemManager()
-{
-    return m_systemManager;
-}
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Race)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Item)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Goods)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Equipment)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Micromodulus)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Artefact)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Hull)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Engine)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Tank)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Droid)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, CargoHook)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, DefenceGenerator)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Radar)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Scanner)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Weapon)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Sector)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, PlanetarySystem)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, SpaceObject)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Container)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Asteroid)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Planet)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, MannedObject)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, InhabitedPlanet)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, DesertPlanet)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, Ship)
+WORLD_JS_DEFAULT_OBJECT_CONSTRUCTOR(WorldManager, SpaceStation)
 
-StyleManager& WorldManager::styleManager()
-{
-    return m_styleManager;
-}
 }
 }

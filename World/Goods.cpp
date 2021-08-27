@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,67 +17,55 @@
 */
 
 #include "Goods.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Goods::Goods(uint64_t id): Item(id)
+const quint32 Goods::m_staticTypeId = typeIdFromClassName(Goods::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Goods>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Goods>("OpenSR.World", 1, 0, "Goods");
+}
+
+template<>
+Goods* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Goods(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Goods>()
+{
+    return Goods::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Goods>()
+{
+    return &Goods::staticMetaObject;
+}
+
+Goods::Goods(WorldObject *parent, quint32 id): Item(parent, id)
 {
 }
 
-bool Goods::deserialize(std::istream& stream)
+Goods::~Goods()
 {
-    if (!Item::deserialize(stream))
-        return false;
-
-    stream.read((char *)&m_quantity, sizeof(uint32_t));
-    stream.read((char *)&m_price, sizeof(uint32_t));
-
-    if (!stream.good())
-        return false;
-
-    return true;
 }
 
-uint32_t Goods::price() const
+quint32 Goods::typeId() const
 {
-    return m_price;
+    return Goods::m_staticTypeId;
 }
 
-uint32_t Goods::quantity() const
+QString Goods::namePrefix() const
 {
-    return m_quantity;
-}
-
-bool Goods::serialize(std::ostream& stream) const
-{
-    if (!Item::serialize(stream))
-        return false;
-
-    stream.write((const char *)&m_quantity, sizeof(uint32_t));
-    stream.write((const char *)&m_price, sizeof(uint32_t));
-
-    if (!stream.good())
-        return false;
-
-    return true;
-}
-
-uint32_t Goods::type() const
-{
-    return WorldHelper::TYPE_GOODS;
-}
-
-void Goods::setPrice(uint32_t price)
-{
-    m_price = price;
-}
-
-void Goods::setQuantity(uint32_t quantity)
-{
-    m_quantity = quantity;
+    return tr("Goods");
 }
 }
 }

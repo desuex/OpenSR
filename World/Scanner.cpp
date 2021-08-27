@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,29 +17,55 @@
 */
 
 #include "Scanner.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Scanner::Scanner(uint64_t id): Equipment(id)
+const quint32 Scanner::m_staticTypeId = typeIdFromClassName(Scanner::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Scanner>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Scanner>("OpenSR.World", 1, 0, "Scanner");
+}
+
+template<>
+Scanner* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Scanner(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Scanner>()
+{
+    return Scanner::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Scanner>()
+{
+    return &Scanner::staticMetaObject;
+}
+
+Scanner::Scanner(WorldObject *parent, quint32 id): Equipment(parent, id)
 {
 }
 
-bool Scanner::deserialize(std::istream& stream)
+Scanner::~Scanner()
 {
-    return Equipment::deserialize(stream);
 }
 
-bool Scanner::serialize(std::ostream& stream) const
+quint32 Scanner::typeId() const
 {
-    return Equipment::serialize(stream);
+    return Scanner::m_staticTypeId;
 }
 
-uint32_t Scanner::type() const
+QString Scanner::namePrefix() const
 {
-    return WorldHelper::TYPE_SCANNER;
+    return tr("Scanner");
 }
 }
 }

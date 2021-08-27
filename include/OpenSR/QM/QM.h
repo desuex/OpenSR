@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2013 - 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,30 +16,31 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RANGERS_QM_H
-#define RANGERS_QM_H
+#ifndef OPENSR_QM_H
+#define OPENSR_QM_H
 
-#include <stdint.h>
-#include <string>
-#include <iostream>
-#include <vector>
-#include <map>
+#include <cstdint>
+#include <QString>
+#include <QMap>
+#include <QList>
 
-#ifdef QM_LIBRARY
-#ifdef WIN32
-#define QM_API __declspec(dllexport)
+#ifdef QM_LIBRARY_BUILD
+# ifdef WIN32
+#  define QM_API __declspec(dllexport)
+# else
+#  define QM_API
+# endif
 #else
-#define QM_API
-#endif
-#else
-#ifdef WIN32
-#define QM_API
-#else
-#define QM_API
-#endif
+# ifdef WIN32
+#  define QM_API
+# else
+#  define QM_API
+# endif
 #endif
 
-namespace Rangers
+class QIODevice;
+
+namespace OpenSR
 {
 namespace QM
 {
@@ -50,7 +51,7 @@ struct QM_API Parameter
     {
         int32_t from;
         int32_t to;
-        std::string text;
+        QString text;
     };
 
     uint32_t id;
@@ -65,12 +66,12 @@ struct QM_API Parameter
     bool active;
     bool money;
 
-    std::string name;
-    std::string critText;
+    QString name;
+    QString critText;
 
-    std::vector<Range> ranges;
+    QList<Range> ranges;
 
-    std::string start;
+    QString start;
 };
 
 struct QM_API Modifier
@@ -83,7 +84,7 @@ struct QM_API Modifier
 
     uint32_t param;
     int32_t value;
-    std::string expression;
+    QString expression;
 };
 
 struct QM_API Transition
@@ -97,8 +98,8 @@ struct QM_API Transition
 
         bool includeValues;
         bool includeMultiples;
-        std::vector<int32_t> values;
-        std::vector<uint32_t> multiples;
+        QList<int32_t> values;
+        QList<uint32_t> multiples;
     };
 
     uint32_t id;
@@ -114,12 +115,12 @@ struct QM_API Transition
     uint32_t passCount;
     uint32_t position;
 
-    std::vector<Modifier> modifiers;
-    std::vector<Condition> conditions;
+    QList<Modifier> modifiers;
+    QList<Condition> conditions;
 
-    std::string globalCondition;
-    std::string title;
-    std::string description;
+    QString globalCondition;
+    QString title;
+    QString description;
 };
 
 struct QM_API Location
@@ -139,12 +140,12 @@ struct QM_API Location
 
     //! Description selected by expression
     bool descriptionExpression;
-    std::string expression;
+    QString expression;
 
-    std::vector<Modifier> modifiers;
-    std::vector<std::string> descriptions;
+    QList<Modifier> modifiers;
+    QList<QString> descriptions;
 
-    std::vector<Transition> transitions;
+    QList<Transition> transitions;
 };
 
 struct QM_API QuestInfo
@@ -157,8 +158,8 @@ struct QM_API QuestInfo
     int32_t relation;
     uint32_t difficulty;
 
-    std::string winnerText;
-    std::string descriptionText;
+    QString winnerText;
+    QString descriptionText;
 };
 
 struct QM_API Quest
@@ -166,28 +167,28 @@ struct QM_API Quest
     enum Race {RACE_MALOQ = 0x01, RACE_PELENG = 0x02, RACE_HUMAN = 0x04, RACE_FAEYAN = 0x08, RACE_GAAL = 0x10, RACE_NONE = 0x40, RACE_ANY = 0xFF};
     enum PlayerType {PLAYER_TRADER = 0x01, PLAYER_PIRATE = 0x02, PLAYER_WARRIOR = 0x04, PLAYER_ANY = 0xFF};
 
-    std::map<uint32_t, Parameter> parameters;
-    std::map<uint32_t, Location> locations;
+    QMap<uint32_t, Parameter> parameters;
+    QMap<uint32_t, Location> locations;
 
     uint32_t startLocation;
 
     QuestInfo info;
 
-    std::string toStar;
-    std::string toPlanet;
-    std::string date;
-    std::string money;
-    std::string fromPlanet;
-    std::string fromStar;
-    std::string ranger;
+    QString toStar;
+    QString toPlanet;
+    QString date;
+    QString money;
+    QString fromPlanet;
+    QString fromStar;
+    QString ranger;
 };
 
 //! Load whole quest.
-QM_API Quest readQuest(std::istream& s);
+QM_API Quest readQuest(QIODevice *dev);
 
 //! Load only information about quest
-QM_API QuestInfo readQuestInfo(std::istream& s);
+QM_API QuestInfo readQuestInfo(QIODevice *dev);
 }
 }
 
-#endif
+#endif // OPENSR_QM_H

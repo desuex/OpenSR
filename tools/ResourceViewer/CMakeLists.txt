@@ -1,33 +1,34 @@
-FIND_PACKAGE(Qt5Core REQUIRED)
 FIND_PACKAGE(Qt5Widgets REQUIRED)
-
-SET(CMAKE_AUTOMOC ON)
 
 SET(RV_SOURCES
     main.cpp
     MainWindow.cpp
     FileModel.cpp
+    ExtractDialog.cpp
+)
+
+SET(RV_HEADERS
+    MainWindow.h
+    FileModel.h
+    ExtractDialog.h
 )
 
 SET(RV_UI
     MainWindow.ui
+    ExtractDialog.ui
 )
 
 INCLUDE_DIRECTORIES(
-  ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_SOURCE_DIR}/include/OpenSR
+  ${CMAKE_SOURCE_DIR}/include
   ${Qt5Widgets_INCLUDE_DIRS}
   ${Qt5Core_INCLUDE_DIRS}
-  ${Boost_INCLUDE_DIR}
 )
 
-SET(RV_COMPILE_FLAGS "${Qt5Core_EXECUTABLE_COMPILE_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
-
+QT5_WRAP_CPP(RV_MOC_SOURCES ${RV_HEADERS})
 QT5_WRAP_UI(RV_UI_SOURCES ${RV_UI})
 
-ADD_EXECUTABLE(opensr-resourceviewer ${RV_SOURCES} ${RV_UI_SOURCES})
+ADD_EXECUTABLE(opensr-resourceviewer ${RV_SOURCES} ${RV_UI_SOURCES} ${RV_MOC_SOURCES})
 
-SET_TARGET_PROPERTIES(opensr-resourceviewer PROPERTIES COMPILE_FLAGS ${RV_COMPILE_FLAGS})
-TARGET_LINK_LIBRARIES(opensr-resourceviewer ranger Qt5::Core Qt5::Widgets ${SQUISH_LIBRARIES})
+TARGET_LINK_LIBRARIES(opensr-resourceviewer RangerQt Qt5::Core Qt5::Widgets)
 
 INSTALL(TARGETS opensr-resourceviewer RUNTIME DESTINATION bin)

@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 - 2014 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 - 2017 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,97 +16,75 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RANGERS_ENGINE_H
-#define RANGERS_ENGINE_H
+#ifndef OPENSR_ENGINE_H
+#define OPENSR_ENGINE_H
 
-#include "OpenSR/global.h"
-#include "OpenSR/Styles.h"
+#include <QApplication>
+#include <QUrl>
+#include <OpenSR/OpenSR.h>
 
-#include <string>
-#include <boost/shared_ptr.hpp>
-#include <boost/property_tree/ptree.hpp>
+class QQuickView;
+class QQmlEngine;
+class QQmlApplicationEngine;
+class QJSEngine;
 
-namespace Rangers
+#define osrEngine (static_cast<OpenSR::Engine *>(QApplication::instance()))
+
+namespace OpenSR
 {
-class Widget;
-class Object;
-class Plugin;
-class Font;
-class Node;
-//! Main engine class
-class RANGERS_ENGINE_API Engine
+class SoundManager;
+class ResourceManager;
+class ENGINE_API Engine: public QApplication
 {
-    class EnginePrivate;
-    RANGERS_DECLARE_PRIVATE(Engine)
+    Q_OBJECT
+    OPENSR_DECLARE_PRIVATE(Engine)
+
+    Q_PROPERTY(QString dataDir READ dataDir WRITE setDataDir NOTIFY dataDirChanged)
+    Q_PROPERTY(QUrl startupScript READ startupScript WRITE setStartupScript NOTIFY startupScriptChanged)
+    Q_PROPERTY(QUrl mainQML READ mainQML WRITE setMainQML NOTIFY mainQMLChanged)
+    Q_PROPERTY(OpenSR::ResourceManager* resources READ resources)
+    Q_PROPERTY(OpenSR::SoundManager* sound READ sound)
 
 public:
-    //! Init engine
-    void init(int argc, char **argv, int width, int height, bool fullscreen = false);
-    //! Main paint function
-    void paint();
-    //! End loop
-    void quit(int code = 0);
-    //! Main loop
+    Engine(int& argc, char **argv);
+    virtual ~Engine();
+
     int run();
-    //! Exec command (e.g. from console)
-    void execCommand(const std::string& what);
 
-    //! Mark object been updated in main (OpenGL) thread
-    void markToUpdate(Object* object);
-    //! Disable object been updated in main (OpenGL) thread
-    void unmarkToUpdate(Object* object);
-    //! Add widget to top widgets
-    void addWidget(boost::shared_ptr<Widget> w);
-    //! Remove widget from top widgets
-    void removeWidget(boost::shared_ptr<Widget> w);
-    //! Focus widget for key input handling
-    void focusWidget(boost::weak_ptr<Widget> w);
-    //! Unfocus widget for key input handling
-    void unfocusWidget(boost::weak_ptr<Widget> w);
-    //! Widget will be hidden now.
-    void widgetHide(Widget *w);
-    //! Widget will be destroyed now.
-    void widgetDestroyed(Widget *w);
-    //! Try to get smart pointer of object
-    boost::shared_ptr<Object> getObjectPointer(Object *object) const;
+    SoundManager *sound() const;
+    ResourceManager *resources() const;
 
-    //! Current screen height
-    int screenHeight() const;
-    //! Current screen width
-    int screenWidth() const;
+    QQmlEngine *qmlEngine() const;
+    QJSEngine *scriptEngine() const;
 
-    //! Default engine font
-    boost::shared_ptr<Font> coreFont() const;
-    //! Default engine service font (e.g. console font)
-    boost::shared_ptr<Font> serviceFont() const;
+    Q_INVOKABLE QVariant datValue(const QString& path) const;
 
-    //! Engine instance
-    static Engine& instance();
+    Q_INVOKABLE void execScript(const QUrl& url);
 
-    //! Current ticks
-    static long long getTicks();
+    QString dataDir() const;
+    QUrl startupScript() const;
+    QUrl mainQML() const;
 
-    //! Logic loop
-    static int logic();
+    void setDataDir(const QString& dir);
+    void setStartupScript(const QUrl& script);
+    void setMainQML(const QUrl& qml);
 
-    //! Global program options
-    boost::shared_ptr<boost::property_tree::ptree> properties() const;
+public Q_SLOTS:
+    void addRCCArchive(const QString& source);
+    void showQMLComponent(const QString& url);
+    void addDATFile(const QString& url, bool isCache = false);
+    void loadPlugin(const QString& name);
 
-    boost::shared_ptr<Node> rootNode();
-
-    boost::shared_ptr<Skin> defaultSkin() const;
-    void setDefaultSkin(boost::shared_ptr<Skin> skin);
-    void setDefaultSkin(const std::string& skinObjectPath);
-
-    void loadPlugin(const std::string &path);
+Q_SIGNALS:
+    void dataDirChanged();
+    void startupScriptChanged();
+    void mainQMLChanged();
 
 private:
-    Engine();
-    Engine(const Engine& other);
-    ~Engine();
-
-    EnginePrivate *m_d;
+    OPENSR_DECLARE_DPOINTER(Engine)
+    Q_DISABLE_COPY(Engine)
 };
+
 }
 
 #endif

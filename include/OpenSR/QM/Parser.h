@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2013 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2013 - 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,15 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RANGERS_QM_PARSER_H
-#define RANGERS_QM_PARSER_H
-
-#include <list>
-#include <map>
+#ifndef OPENSR_QM_PARSER_H
+#define OPENSR_QM_PARSER_H
 
 #include "QM.h"
 
-namespace Rangers
+#include <QList>
+#include <QMap>
+
+namespace OpenSR
 {
 namespace QM
 {
@@ -56,15 +56,15 @@ public:
         };
     } value;
 
-    std::vector<float> list;
+    QList<float> list;
 
-    Token apply(const Token &a, const Token &b, const std::map<uint32_t, float> &parameters) const;
+    Token apply(const Token &a, const Token &b, const QMap<uint32_t, float> &parameters) const;
 };
 
-QM_API std::list<Token> tokenize(const std::string& exp);
-QM_API float eval(const std::list<Token>& exp, const std::map<uint32_t, float> &parameters);
-QM_API float eval(const std::string& exp, const std::map<uint32_t, float> &parameters);
+QM_API QList<Token> tokenize(const QString& exp);
+QM_API float eval(const QList<Token>& exp, const QMap<uint32_t, float> &parameters);
+QM_API float eval(const QString& exp, const QMap<uint32_t, float> &parameters);
 }
 }
 
-#endif
+#endif // OPENSR_QM_PARSER_H

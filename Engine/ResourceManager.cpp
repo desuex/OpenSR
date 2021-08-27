@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 - 2014 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 - 2017 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,627 +17,521 @@
 */
 
 #include "OpenSR/ResourceManager.h"
+#include "ResourceManager_p.h"
 
-#include <algorithm>
-#include <boost/thread.hpp>
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <SDL_rwops.h>
+#include "OpenSR/Engine.h"
 
-#include "OpenSR/RPKGAdapter.h"
-#include "OpenSR/FSAdapter.h"
-#include "OpenSR/Texture.h"
-#include "OpenSR/AnimatedTexture.h"
-#include "OpenSR/Log.h"
-#include "OpenSR/AFTFont.h"
-#include "OpenSR/FTFont.h"
-#include "OpenSR/AnimatedSprite.h"
-#include "OpenSR/Object.h"
-#include "OpenSR/GAISprite.h"
+#include <QQmlNetworkAccessManagerFactory>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QFile>
+#include <QString>
+#include <QUrl>
+#include <QMetaObject>
+#include <QDirIterator>
+#include <QBuffer>
 
-using namespace std;
+#include <QDebug>
 
-namespace
+namespace OpenSR
 {
-int64_t istreamSeek(struct SDL_RWops *context, int64_t offset, int whence)
+ResourceReply::ResourceReply(const QUrl& url, QIODevice *device, QObject *parent): QNetworkReply(parent)
 {
-    std::istream* stream = (std::istream*)context->hidden.unknown.data1;
-
-    if (!stream)
-        return -1;
-
-    if (whence == SEEK_SET)
-        stream->seekg(offset, std::ios::beg);
-    else if (whence == SEEK_CUR)
-        stream->seekg(offset, std::ios::cur);
-    else if (whence == SEEK_END)
-        stream->seekg(offset, std::ios::end);
-
-    return stream->fail() ? -1 : int(stream->tellg());
-}
-
-
-size_t istreamRead(SDL_RWops *context, void *ptr, size_t size, size_t maxnum)
-{
-    if (size == 0) return -1;
-    std::istream* stream = (std::istream*) context->hidden.unknown.data1;
-
-    if (!stream)
-        return -1;
-
-    stream->read((char*)ptr, size * maxnum);
-
-    return stream->bad() ? -1 : stream->gcount() / size;
-}
-
-int istreamClose(SDL_RWops *context)
-{
-    if (context)
+    m_device = device;
+    if (!m_device || !m_device->isOpen())
     {
-        std::istream* stream = (std::istream*) context->hidden.unknown.data1;
-
-        if (stream)
-        {
-            delete stream;
-            context->hidden.unknown.data1 = 0;
-        }
-        SDL_FreeRW(context);
+        setError(QNetworkReply::UnknownContentError, QString("Cannot open resource file: %1").arg(url.path()));
+        m_device = 0;
     }
-    return 0;
-}
+    if (m_device)
+        m_device->setParent(this);
+
+    QMetaObject::invokeMethod(this, "emitFinished", Qt::QueuedConnection);
 }
 
-namespace Rangers
+void ResourceReply::emitFinished()
 {
-ResourceManager::ResourceManager()
-{
-    m_datRoot = boost::shared_ptr<DATRecord>(new DATRecord(DATRecord::NODE));
+    setFinished(true);
+    emit(finished());
 }
 
-ResourceManager::ResourceManager(const ResourceManager& other)
+ResourceReply::~ResourceReply()
+{
+    close();
+}
+
+void ResourceReply::abort()
+{
+    close();
+}
+
+qint64 ResourceReply::bytesAvailable() const
+{
+    if (!m_device)
+        return QIODevice::bytesAvailable();
+    return QIODevice::bytesAvailable() + m_device->bytesAvailable();
+}
+
+bool ResourceReply::canReadLine() const
+{
+    if (!m_device)
+        return QIODevice::canReadLine();
+    return QIODevice::canReadLine() || m_device->canReadLine();
+}
+
+void ResourceReply::close()
+{
+    QNetworkReply::close();
+
+    if (!m_device)
+        return;
+    m_device->close();
+    m_device = 0;
+}
+
+bool ResourceReply::isSequential() const
+{
+    return false;
+}
+
+qint64 ResourceReply::size() const
+{
+    if (!m_device)
+        return -1;
+    qint64 size = m_device->size();
+    return size;
+}
+
+bool ResourceReply::seek(qint64 pos)
+{
+    if (!m_device)
+        return false;
+    QIODevice::seek(pos);
+    return m_device->seek(pos);
+}
+
+qint64 ResourceReply::readData(char * data, qint64 maxSize)
+{
+    if (!m_device)
+        return -1;
+    if (!maxSize)
+        return 0;
+    return m_device->read(data, maxSize);
+}
+
+ResourceManagerNAM::ResourceManagerNAM(ResourceManager *manager, QObject *parent): QNetworkAccessManager(parent),
+    m_manger(manager)
 {
 }
 
-class ResourceManager::GAIWorker
+ResourceManagerNAM::~ResourceManagerNAM()
+{
+}
+
+QNetworkReply* ResourceManagerNAM::createRequest(Operation op, const QNetworkRequest & req, QIODevice *outgoingData)
+{
+    QUrl url = req.url();
+    QString scheme = url.scheme();
+    if ((scheme.compare("res", Qt::CaseInsensitive) == 0) ||
+        (scheme.compare("dat", Qt::CaseInsensitive) == 0) &&
+            (op == QNetworkAccessManager::GetOperation))
+    {
+        QIODevice *dev = m_manger->getIODevice(url);
+        ResourceReply *reply = new ResourceReply(url, dev, this);
+        connect(reply, SIGNAL(finished()), this, SLOT(emitReplyFinished()));
+        reply->setOperation(op);
+        reply->setRequest(req);
+        reply->setUrl(url);
+        reply->open(QIODevice::ReadOnly);
+        return reply;
+    }
+    else
+        return QNetworkAccessManager::createRequest(op, req, outgoingData);
+}
+
+void ResourceManagerNAM::emitReplyFinished()
+{
+    QNetworkReply *r = static_cast<QNetworkReply*>(sender());
+    emit(finished(r));
+}
+
+class ResourceManagerNAMFactory: public QQmlNetworkAccessManagerFactory
 {
 public:
-    GAIWorker(const GAIHeader& header, boost::shared_ptr<std::istream> gai, boost::shared_ptr<std::istream> bg);
-    ~GAIWorker();
-    void run();
+    ResourceManagerNAMFactory(ResourceManager* manager): QQmlNetworkAccessManagerFactory(),
+        m_manager(manager)
+    {
+    }
 
-    GAIAnimation animation() const;
-    bool loaded() const;
-    void cleanFrame(int i);
-
-    static void loadAnimation(GAIWorker *worker);
+    virtual QNetworkAccessManager *create(QObject *parent)
+    {
+        return new ResourceManagerNAM(m_manager, parent);
+    }
 
 private:
-    boost::shared_ptr<std::istream> m_gai;
-    boost::shared_ptr<std::istream> m_bgFrame;
-    GAIAnimation m_animation;
-    boost::thread *m_thread;
-    GAIHeader m_header;
-    bool m_loaded;
+    ResourceManager *m_manager;
 };
 
-ResourceManager& ResourceManager::instance()
+ResourceProvider::~ResourceProvider()
 {
-    static ResourceManager manager;
-    return manager;
 }
 
-SDL_RWops *ResourceManager::getSDLRW(const std::string& name)
+FSProvider::FSProvider(const QString& dir): m_dir(dir)
 {
-    if (name.empty())
-        return 0;
-
-    string realName = name;
-    std::transform(name.begin(), name.end(), realName.begin(), ::tolower);
-
-    std::map<std::string, boost::shared_ptr<ResourceAdapter> >::iterator fileIt = m_files.find(realName);
-    if (fileIt == m_files.end())
-    {
-        Log::error() << "No such file: " << name;
-        return 0;
-    }
-
-    std::istream *s = fileIt->second->getStream(realName);
-
-    SDL_RWops *rwops;
-    rwops = SDL_AllocRW();
-
-    if (rwops != NULL)
-    {
-        rwops->seek = istreamSeek;
-        rwops->read = istreamRead;
-        rwops->write = 0;
-        rwops->close = istreamClose;
-        rwops->hidden.unknown.data1 = s;
-    }
-    return rwops;
 }
 
-void ResourceManager::addRPKG(const std::string& path)
+FSProvider::~FSProvider()
 {
-    boost::shared_ptr<RPKGAdapter> a = boost::shared_ptr<RPKGAdapter>(new RPKGAdapter());
-    a->load(path);
-    m_adapters.push_back(a);
-    list<string> adapterFiles = a->getFiles();
-    for (list<string>::const_iterator i = adapterFiles.begin(); i != adapterFiles.end(); ++i)
-        m_files[(*i)] = a;
 }
 
-void ResourceManager::addDir(const std::string& path)
+void FSProvider::load(ResourceNode& current, const QDir& dir)
 {
-    boost::shared_ptr<FSAdapter> a = boost::shared_ptr<FSAdapter>(new FSAdapter());
-    a->load(path);
-    m_adapters.push_back(a);
-    list<string> adaptorFiles = a->getFiles();
-    for (list<string>::const_iterator i = adaptorFiles.begin(); i != adaptorFiles.end(); ++i)
-        m_files[(*i)] = a;
-}
-
-
-boost::shared_ptr<Texture> ResourceManager::loadTexture(const std::string& name)
-{
-    map<string, boost::shared_ptr<Texture> >::const_iterator it = m_textures.find(name);
-    if (it != m_textures.end())
-        return it->second;
-
-    string sfx = suffix(name);
-    std::transform(sfx.begin(), sfx.end(), sfx.begin(), ::tolower);
-
-    boost::shared_ptr<std::istream> s;
-
-    if (sfx != "gai")
-    {
-        s = getFileStream(name);
-        if (!s)
-            return boost::shared_ptr<Texture>();
-    }
-
-    transform(sfx.begin(), sfx.end(), sfx.begin(), towlower);
-    if (sfx == "gi")
-    {
-        GIFrame frame = loadGIFrame(*s);
-
-        Texture *t;
-        if (frame.format == GIFrame::Format_RGB16)
-            t = new Texture(frame.width, frame.height, Rangers::TEXTURE_R5G6B5, frame.data);
-        else
-            t = new Texture(frame.width, frame.height, Rangers::TEXTURE_B8G8R8A8, frame.data);
-
-        delete[] frame.data;
-        m_textures[name] = boost::shared_ptr<Texture>(t);
-        return m_textures[name];
-    }
-    else if (sfx == "png")
-    {
-        PNGFrame frame = loadPNG(*s);
-        if (frame.type == PNGFrame::TYPE_INVALID)
-        {
-            Log::warning() << "Invalid/unsupported PNG file";
-            return boost::shared_ptr<Texture>();
-        }
-        TextureType type;
-        switch (frame.type)
-        {
-        case PNGFrame::TYPE_GRAY:
-            //FIXME: grayscale as alpha
-            type = Rangers::TEXTURE_A8;
-            break;
-        case PNGFrame::TYPE_RGB:
-            type = Rangers::TEXTURE_R8G8B8;
-            break;
-        case PNGFrame::TYPE_RGBA:
-            type = Rangers::TEXTURE_R8G8B8A8;
-            break;
-        }
-        Texture *t = new Texture(frame.width, frame.height, type, frame.data);
-        delete[] frame.data;
-        m_textures[name] = boost::shared_ptr<Texture>(t);
-        return m_textures[name];
-    }
-    else if (sfx == "gai")
-    {
-        auto it = m_animations.find(name);
-        if (it != m_animations.end())
-            return it->second;
-
-        s = getFileStream(name);
-        if (!s)
-            return boost::shared_ptr<Texture>();
-
-        boost::shared_ptr<std::istream> bgFrameStream;
-        GAIHeader header = loadGAIHeader(*s);
-
-        s->seekg(0, ios_base::beg);
-
-        if (header.haveBackground)
-        {
-            return loadTexture(directory(name) + basename(name) + ".gi");
-        }
-
-        GAIAnimation animation = loadGAIAnimation(*s, header);
-        Texture *t;
-        if (animation.frames[0].format == GIFrame::Format_RGB16)
-            t = new Texture(animation.frames[0].width, animation.frames[0].height, Rangers::TEXTURE_R5G6B5, animation.frames[0].data);
-        else
-            t = new Texture(animation.frames[0].width, animation.frames[0].height, Rangers::TEXTURE_B8G8R8A8, animation.frames[0].data);
-        m_textures[name] = boost::shared_ptr<Texture>(t);
-
-        for (int i = 0; i < animation.frameCount; i++)
-            delete[] animation.frames[i].data;
-        delete[] animation.frames;
-        delete[] animation.times;
-        return m_textures[name];
-    }
-    else if (sfx == "jpg" || sfx == "jpeg")
-    {
-        JPEGFrame frame = loadJPEG(*s);
-        if (frame.type == JPEGFrame::TYPE_INVALID)
-        {
-            Log::warning() << "Invalid/unsupported PNG file";
-            return boost::shared_ptr<Texture>();
-        }
-        TextureType type;
-        switch (frame.type)
-        {
-        case JPEGFrame::TYPE_GRAY:
-            //FIXME: grayscale as alpha
-            type = Rangers::TEXTURE_A8;
-            break;
-        case JPEGFrame::TYPE_RGB:
-            type = Rangers::TEXTURE_R8G8B8;
-            break;
-        }
-        Texture *t = new Texture(frame.width, frame.height, type, frame.data);
-        delete[] frame.data;
-        m_textures[name] = boost::shared_ptr<Texture>(t);
-        return m_textures[name];
-    }
-    else
-        Log::error() << "Unknown texture format: " << sfx;
-
-    return boost::shared_ptr<Texture>();
-}
-
-boost::shared_ptr<AnimatedTexture> ResourceManager::loadAnimation(const std::string& name, bool backgroundLoading)
-{
-    map<string, boost::shared_ptr<AnimatedTexture> >::const_iterator it = m_animations.find(name);
-    if (it != m_animations.end())
-        return it->second;
-
-    boost::shared_ptr<std::istream> s = getFileStream(name);
-    if (!s)
-        return boost::shared_ptr<AnimatedTexture>();
-
-    string sfx = suffix(name);
-    std::transform(sfx.begin(), sfx.end(), sfx.begin(), ::tolower);
-    if (sfx == "gai")
-    {
-        boost::shared_ptr<std::istream> bgFrameStream;
-        GAIHeader header = loadGAIHeader(*s);
-
-        s->seekg(0, ios_base::beg);
-
-        if (header.haveBackground)
-        {
-            bgFrameStream = getFileStream(directory(name) + basename(name) + ".gi");
-            if (!bgFrameStream)
-                return boost::shared_ptr<AnimatedTexture>();
-        }
-
-        if (backgroundLoading)
-        {
-            AnimatedTexture *t = new AnimatedTexture(header.finishX - header.startX,
-                    header.finishY - header.startY,
-                    header.waitSeek, header.waitSize,
-                    header.frameCount);
-
-            m_animations[name] = boost::shared_ptr<AnimatedTexture>(t);
-            GAIWorker *worker = new GAIWorker(header, s, bgFrameStream);
-            m_gaiQueue[m_animations[name]] = worker;
-            worker->run();
-        }
-        else
-        {
-            GAIWorker worker(header, s, bgFrameStream);
-            worker.loadAnimation(&worker);
-            m_animations[name] = boost::shared_ptr<AnimatedTexture>(new AnimatedTexture(worker.animation()));
-        }
-        return m_animations[name];
-    }
-    else
-        Log::error() << "Unknown animation format: " << sfx;
-
-    return boost::shared_ptr<AnimatedTexture>();
-}
-
-boost::shared_ptr< Font > ResourceManager::loadFont(const FontDescriptor& desc)
-{
-    return loadFont(desc.path, desc.size, desc.antialiasing);
-}
-
-boost::shared_ptr< Font > ResourceManager::loadFont(const std::string& name, int size, bool antialiased)
-{
-    ostringstream s(name);
-    s.seekp(0, ios_base::end);
-    s << ":" << size << ":" << antialiased;
-    string mapName = s.str();
-
-    map<string, boost::shared_ptr<Font> >::const_iterator it = m_fonts.find(mapName);
-    if (it != m_fonts.end())
-        return it->second;
-
-
-    boost::shared_ptr<std::istream> stream = getFileStream(name);
-    if (!stream)
-        return boost::shared_ptr<Font>();
-
-    string sfx = suffix(name);
-    transform(sfx.begin(), sfx.end(), sfx.begin(), ::tolower);
-
-    if (sfx == "ttf")
-    {
-        stream->seekg(0, std::ios_base::end);
-        uint32_t dataSize = stream->tellg();
-        stream->seekg(0, std::ios_base::beg);
-
-        char *data = new char[dataSize];
-        stream->read(data, dataSize);
-
-        Font *f = new FTFont(data, dataSize, size, antialiased);
-        delete[] data;
-        m_fonts[mapName] = boost::shared_ptr<Font>(f);
-        return m_fonts[mapName];
-    }
-    if (sfx == "aft")
-    {
-        AFT f = loadAFTFont(*stream);
-        if ((f.glyphCount == 0) || (f.glyphs == 0))
-            return boost::shared_ptr<Font>();
-
-        m_fonts[mapName] = boost::shared_ptr<Font>(new AFTFont(f));
-        return m_fonts[mapName];
-    }
-    else
-        Log::error() << "Unknown font format: " << sfx;
-
-    return boost::shared_ptr<Font>();
-}
-
-void ResourceManager::processMain()
-{
-    cleanupUnused();
-    processGAIQueue();
-}
-
-boost::shared_array<char> ResourceManager::loadData(const std::string& name, size_t &size)
-{
-    boost::shared_ptr<std::istream> s = ResourceManager::instance().getFileStream(name);
-    if (!s)
-        return boost::shared_array<char>();
-
-    s->seekg(0, std::ios_base::end);
-    size = s->tellg();
-    if (!size)
-        return boost::shared_array<char>();
-
-    char *data = new char[size];
-    s->seekg(0, std::ios_base::beg);
-    s->read(data, size);
-
-    return boost::shared_array<char>(data);
-}
-
-bool ResourceManager::resourceExists(const std::string& path)
-{
-    if (path.empty())
-        return false;
-
-    string realName = path;
-    std::transform(path.begin(), path.end(), realName.begin(), ::tolower);
-
-    std::map<std::string, boost::shared_ptr<ResourceAdapter> >::iterator fileIt = m_files.find(realName);
-    if (fileIt == m_files.end())
-        return false;
-    else
-        return true;
-}
-
-
-boost::shared_ptr<std::istream> ResourceManager::getFileStream(const std::string& name)
-{
-    if (name.empty())
-        return boost::shared_ptr<std::istream>();
-
-
-    string realName = name;
-    std::transform(name.begin(), name.end(), realName.begin(), ::tolower);
-
-    std::map<std::string, boost::shared_ptr<ResourceAdapter> >::iterator fileIt = m_files.find(realName);
-    if (fileIt == m_files.end())
-    {
-        Log::error() << "No such file: " << name;
-        return boost::shared_ptr<std::istream>();
-    }
-    return boost::shared_ptr<std::istream>(fileIt->second->getStream(realName));
-}
-
-void ResourceManager::processGAIQueue()
-{
-    std::list<boost::shared_ptr<AnimatedTexture> > animationsToRemove;
-
-    for (std::map<boost::shared_ptr<AnimatedTexture>, GAIWorker*>::iterator i = m_gaiQueue.begin(); i != m_gaiQueue.end(); ++i)
-    {
-        boost::shared_ptr<AnimatedTexture> t = (*i).first;
-        GAIWorker *w = (*i).second;
-        if (!w->loaded())
-            continue;
-
-        if (t->needFrames())
-        {
-            int f = t->loadedFrames();
-            t->loadFrame((char *)w->animation().frames[f].data,
-                         w->animation().frames[f].width,
-                         w->animation().frames[f].height, TEXTURE_B8G8R8A8);
-            w->cleanFrame(f);
-            if (t->loadedFrames() >= t->frameCount())
-            {
-                delete w;
-                animationsToRemove.push_back(i->first);
-            }
-        }
-    }
-    for (std::list<boost::shared_ptr<AnimatedTexture> >::const_iterator i = animationsToRemove.begin(); i != animationsToRemove.end(); ++i)
-        m_gaiQueue.erase(*i);
-    animationsToRemove.clear();
-}
-
-void ResourceManager::cleanupUnused()
-{
-    std::list<std::string> animationsToRemove;
-    std::list<std::string> texturesToRemove;
-    std::list<std::string> fontsToRemove;
-
-    map<std::string, boost::shared_ptr<Texture> >::iterator texturesEnd = m_textures.end();
-    for (map<std::string, boost::shared_ptr<Texture> >::iterator i = m_textures.begin(); i != texturesEnd; ++i)
-        if ((*i).second.use_count() < 2)
-            texturesToRemove.push_back(i->first);
-
-    map<std::string, boost::shared_ptr<AnimatedTexture> >::iterator animEnd = m_animations.end();
-    for (map<std::string, boost::shared_ptr<AnimatedTexture> >::iterator i = m_animations.begin(); i != animEnd; ++i)
-        if ((*i).second.use_count() < 2)
-            animationsToRemove.push_back(i->first);
-
-    std::map<std::string, boost::shared_ptr<Font> >::iterator fontEnd = m_fonts.end();
-    for (map<std::string, boost::shared_ptr<Font> >::iterator i = m_fonts.begin(); i != fontEnd; ++i)
-        if ((*i).second.use_count() < 2)
-            fontsToRemove.push_back(i->first);
-
-
-    std::list<std::string>::const_iterator end = animationsToRemove.end();
-    for (std::list<std::string>::const_iterator i = animationsToRemove.begin(); i != end; ++i)
-    {
-        Log::debug() << "Cleanup " << *i;
-        m_animations.erase(*i);
-    }
-    end = texturesToRemove.end();
-    for (std::list<std::string>::const_iterator i = texturesToRemove.begin(); i != end; ++i)
-    {
-        Log::debug() << "Cleanup " << *i;
-        m_textures.erase(*i);
-    }
-    end = fontsToRemove.end();
-    for (std::list<std::string>::const_iterator i = fontsToRemove.begin(); i != end; ++i)
-    {
-        Log::debug() << "Cleanup " << *i;
-        m_fonts.erase(*i);
-    }
-}
-
-ResourceManager::GAIWorker::GAIWorker(const GAIHeader& header, boost::shared_ptr<std::istream> gai, boost::shared_ptr<std::istream> bg)
-{
-    m_bgFrame = bg;
-    m_gai = gai;
-    m_loaded = false;
-    m_thread = 0;
-    m_header = header;
-}
-
-void ResourceManager::GAIWorker::run()
-{
-    m_thread = new boost::thread(loadAnimation, this);
-}
-
-void ResourceManager::GAIWorker::loadAnimation(GAIWorker *w)
-{
-    GIFrame *bg = 0;
-    if (w->m_bgFrame)
-    {
-        bg = new GIFrame();
-        (*bg) = loadGIFrame(*(w->m_bgFrame), true, 0, 0, w->m_header.startX, w->m_header.startY, w->m_header.finishX, w->m_header.finishY);
-    }
-
-    w->m_animation = loadGAIAnimation(*(w->m_gai), w->m_header, bg);
-    w->m_loaded = true;
-}
-
-ResourceManager::GAIWorker::~GAIWorker()
-{
-    if (m_thread)
-    {
-        m_thread->join();
-        delete m_thread;
-    }
-    for (int i = 0; i < m_animation.frameCount; i++)
-        cleanFrame(i);
-    delete[] m_animation.frames;
-    delete[] m_animation.times;
-}
-
-GAIAnimation ResourceManager::GAIWorker::animation() const
-{
-    return m_animation;
-}
-
-bool ResourceManager::GAIWorker::loaded() const
-{
-    return m_loaded;
-}
-
-void ResourceManager::GAIWorker::cleanFrame(int i)
-{
-    delete[] m_animation.frames[i % m_animation.frameCount].data;
-    m_animation.frames[i % m_animation.frameCount].data = 0;
-}
-
-ResourceObjectManager& ResourceManager::objectManager()
-{
-    return m_objectManager;
-}
-
-void ResourceManager::addDATFile(const std::string& name, bool isCache)
-{
-    boost::shared_ptr<std::istream> stream = getFileStream(name);
-    if (!stream)
+    if (!dir.exists())
         return;
 
-    DATRecord r = loadDAT(*stream, isCache);
-    for (const DATRecord c : r)
-    {
-        if (m_datRoot->find(c.name) != m_datRoot->end())
-            Log::warning() << "[DAT] Item \"" << c.name << "\" already exists in root.";
+    QFileInfoList sub = dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
 
-        m_datRoot->add(c);
+    for (const QFileInfo& child : sub)
+    {
+        QString lowerName = child.fileName().toLower();
+        if (child.isFile())
+        {
+            ResourceNode node(child.fileName(), ResourceNode::FILE, &current,
+                              QSharedPointer<ResourceInfo>(new ResourceInfo()));
+            node.info->provider = this;
+            auto it = current.children.find(lowerName);
+            if (it != current.children.end())
+            {
+                if (it->type == ResourceNode::FILE)
+                    *it = node;
+            }
+            else
+                current.children.insert(lowerName, node);
+        }
+        else if (child.isDir())
+        {
+            ResourceNode node(child.fileName(), ResourceNode::DIRECTORY, &current);
+
+            auto it = current.children.find(lowerName);
+            if (it == current.children.end())
+                it = current.children.insert(lowerName, node);
+
+            load(*it, QDir(child.absoluteFilePath()));
+        }
     }
 }
 
-boost::shared_ptr<DATRecord> ResourceManager::datRoot()
+void FSProvider::load(ResourceNode& root)
 {
-    return m_datRoot;
+    load(root, QDir(m_dir));
 }
 
-
-std::string ResourceManager::datValue(const std::string& path) const
+QIODevice *FSProvider::getDevice(const ResourceNode& node, QObject *parent)
 {
-    std::vector<std::string> nodes = split(path, L'.');
-
-    const DATRecord* current = m_datRoot.get();
-    for (const std::string& id : nodes)
+    QString relativePath = node.name;
+    const ResourceNode *current = node.parent;
+    while (current->parent)
     {
-        DATRecord::const_iterator i = current->find(id);
-        if (i == current->end())
-            return std::string();
-
-        current = i.operator->();
+        relativePath.prepend(current->name + "/");
+        current = current->parent;
     }
+    QFileInfo fi(m_dir + '/' + relativePath);
 
-    return current->value;
+    if (!fi.exists())
+        return 0;
+
+    QFile *result = new QFile(fi.absoluteFilePath(), parent);
+    result->open(QIODevice::ReadOnly);
+
+    return result;
 }
 
+ResourceInfo::ResourceInfo()
+{
+    provider = 0;
+}
+
+ResourceInfo::~ResourceInfo()
+{
+}
+
+ResourceNode::ResourceNode(const QString& name_, Type type_, ResourceNode *parent_, QSharedPointer<ResourceInfo> info_):
+    name(name_), type(type_), parent(parent_), info(info_)
+{
+}
+
+ResourceNode::~ResourceNode()
+{
+}
+
+ResourceManager::ResourceManager(QObject *parent): QObject(parent)
+{
+    m_namFactory = new ResourceManagerNAMFactory(this);
+}
+
+ResourceManager::~ResourceManager()
+{
+    for (ResourceProvider* p : m_dataProviders)
+        delete p;
+}
+
+
+QQmlNetworkAccessManagerFactory *ResourceManager::qmlNAMFactory() const
+{
+    return m_namFactory;
+}
+
+bool ResourceManager::fileExists(const QString& path) const
+{
+    QStringList p = path.split('/', QString::SkipEmptyParts);
+
+    const ResourceNode *current = &m_root;
+
+    for (const QString node : p)
+    {
+        auto it = current->children.find(node.toLower());
+        if (it == current->children.end())
+            return false;
+        current = &(it.value());
+    }
+    return true;
+}
+
+QIODevice *ResourceManager::getIODevice(const QString& path, QObject *parent)
+{
+    QStringList p = path.split('/', QString::SkipEmptyParts);
+
+    ResourceNode *current = &m_root;
+
+    for (const QString node : p)
+    {
+        auto it = current->children.find(node.toLower());
+        if (it == current->children.end())
+            return 0;
+        current = &(it.value());
+    }
+    if (!current->info || !current->info->provider)
+        return 0;
+    return current->info->provider->getDevice(*current, parent);
+}
+
+QIODevice *ResourceManager::getIODevice(const QUrl& path, QObject *parent)
+{
+    if (path.scheme().compare("res", Qt::CaseInsensitive) &&
+        path.scheme().compare("dat", Qt::CaseInsensitive))
+        return 0;
+
+    QString p = path.path();
+    if (!path.scheme().compare("dat", Qt::CaseInsensitive))
+    {
+        if (p.at(0) == '/')
+            p.remove(0, 1);
+        p = qobject_cast<Engine*>(qApp)->datValue(p).toString();
+        p = p.replace("\\", "/");
+    }
+    return getIODevice(p, parent);
+}
+
+void ResourceManager::addFileSystemPath(const QString& path)
+{
+    FSProvider *prov = new FSProvider(path);
+    addProvider(prov);
+}
+
+void ResourceManager::addPKGArchive(const QString& path)
+{
+    PKGProvider *prov = new PKGProvider(path);
+    addProvider(prov);
+}
+
+void ResourceManager::addProvider(ResourceProvider *provider)
+{
+    provider->load(m_root);
+    m_dataProviders.append(provider);
+}
+
+
+PGKResourceInfo::PGKResourceInfo(PKGItem *item_): ResourceInfo(),
+    item(item_)
+{
+}
+
+PGKResourceInfo::~PGKResourceInfo()
+{
+}
+
+PKGIODevice::PKGIODevice(const PKGItem& item, QIODevice *archiveDev, QObject *parent): QIODevice(parent),
+    m_buffer(0)
+{
+    m_data = extractFile(item, archiveDev);
+    if (!m_data.isEmpty())
+    {
+        m_buffer = new QBuffer(&m_data);
+        m_buffer->open(QIODevice::ReadOnly);
+    }
+}
+
+PKGIODevice::~PKGIODevice()
+{
+    if (m_buffer)
+    {
+        m_buffer->close();
+        delete m_buffer;
+        m_buffer = nullptr;
+    }
+}
+
+qint64 PKGIODevice::bytesAvailable() const
+{
+    if (!m_buffer)
+        return -1;
+    return QIODevice::bytesAvailable() + m_buffer->bytesAvailable();
+}
+
+bool PKGIODevice::canReadLine() const
+{
+    if (!m_buffer)
+        return false;
+    return QIODevice::canReadLine() || m_buffer->canReadLine();
+}
+
+bool PKGIODevice::isSequential() const
+{
+    return false;
+}
+
+qint64 PKGIODevice::size() const
+{
+    return m_data.size();
+}
+
+void PKGIODevice::close()
+{
+    if (m_buffer)
+    {
+        m_buffer->close();
+        delete m_buffer;
+        m_buffer = 0;
+    }
+    m_data = QByteArray();
+}
+
+
+bool PKGIODevice::seek(qint64 pos)
+{
+    if (!m_buffer)
+        return false;
+    QIODevice::seek(pos);
+    return m_buffer->seek(pos);
+}
+
+qint64 PKGIODevice::readData(char * data, qint64 maxSize)
+{
+    if (!m_buffer)
+        return -1;
+    return m_buffer->read(data, maxSize);
+}
+
+qint64 PKGIODevice::writeData(const char * data, qint64 maxSize)
+{
+    return -1;
+}
+
+PKGProvider::PKGProvider(const QString& file): m_root(0)
+{
+    QFileInfo fi(file);
+    if (fi.exists())
+    {
+        m_path = fi.absoluteFilePath();
+    }
+}
+
+PKGProvider::~PKGProvider()
+{
+    if (m_root)
+        cleanup(m_root);
+    delete m_root;
+}
+
+void PKGProvider::load(ResourceNode& root)
+{
+    if (m_path.isEmpty())
+        return;
+
+    QFile archive(m_path);
+    archive.open(QIODevice::ReadOnly);
+    if (!archive.isOpen())
+        return;
+
+    m_root = loadPKG(&archive);
+
+    if (!m_root)
+        return;
+
+    archive.close();
+
+    load(root, m_root);
+}
+
+QIODevice *PKGProvider::getDevice(const ResourceNode& node, QObject *parent)
+{
+    if (m_path.isEmpty())
+        return 0;
+
+
+    QFile archive(m_path);
+    archive.open(QIODevice::ReadOnly);
+    if (!archive.isOpen())
+        return 0;
+
+    PGKResourceInfo *info = static_cast<PGKResourceInfo*>(node.info.data());
+
+    PKGIODevice *dev = new PKGIODevice(*info->item, &archive, parent);
+    archive.close();
+    dev->open(QIODevice::ReadOnly);
+    return dev;
+}
+
+void PKGProvider::load(ResourceNode& current, PKGItem* item)
+{
+    for (int i = 0; i < item->childCount; i++)
+    {
+        PKGItem* child = &item->childs[i];
+        QString lowerName = QString(child->name).toLower();
+        if (child->dataType == 3)
+        {
+            ResourceNode node(child->name, ResourceNode::DIRECTORY, &current);
+
+            auto it = current.children.find(lowerName);
+            if (it == current.children.end())
+                it = current.children.insert(lowerName, node);
+
+            load(*it, child);
+        }
+        else
+        {
+            ResourceNode node(child->name, ResourceNode::FILE, &current,
+                              QSharedPointer<ResourceInfo>(new PGKResourceInfo(child)));
+            node.info->provider = this;
+            auto it = current.children.find(lowerName);
+            if (it != current.children.end())
+            {
+                if (it->type == ResourceNode::FILE)
+                    *it = node;
+            }
+            else
+                current.children.insert(lowerName, node);
+        }
+    }
+}
+
+void PKGProvider::cleanup(PKGItem *item)
+{
+    for (int i = 0; i < item->childCount; i++)
+        cleanup(&item->childs[i]);
+    delete[] item->childs;
+}
 }
 
 

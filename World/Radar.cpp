@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,29 +17,55 @@
 */
 
 #include "Radar.h"
-#include "WorldHelper.h"
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-Radar::Radar(uint64_t id): Equipment(id)
+const quint32 Radar::m_staticTypeId = typeIdFromClassName(Radar::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Radar>(QQmlEngine *qml, QJSEngine *script)
+{
+    qmlRegisterType<Radar>("OpenSR.World", 1, 0, "Radar");
+}
+
+template<>
+Radar* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Radar(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Radar>()
+{
+    return Radar::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Radar>()
+{
+    return &Radar::staticMetaObject;
+}
+
+Radar::Radar(WorldObject *parent, quint32 id): Equipment(parent, id)
 {
 }
 
-bool Radar::deserialize(std::istream& stream)
+Radar::~Radar()
 {
-    return Equipment::deserialize(stream);
 }
 
-bool Radar::serialize(std::ostream& stream) const
+quint32 Radar::typeId() const
 {
-    return Equipment::serialize(stream);
+    return Radar::m_staticTypeId;
 }
 
-uint32_t Radar::type() const
+QString Radar::namePrefix() const
 {
-    return WorldHelper::TYPE_RADAR;
+    return tr("Radar");
 }
 }
 }

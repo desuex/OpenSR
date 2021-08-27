@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,132 +17,172 @@
 */
 
 #include "Planet.h"
+#include "ResourceManager.h"
 
-#include "WorldHelper.h"
+#include <QtQml>
 
-#include <cmath>
-#include <OpenSR/libRanger.h>
 
-namespace Rangers
+namespace OpenSR
 {
 namespace World
 {
-Planet::Planet(uint64_t id): SystemObject(id), m_radius(0.0f),
-    m_orbit(0.0f), m_angle(0.0f), m_angleSpeed(0.0f), m_style(0), m_startAngle(0.0f)
+const quint32 Planet::m_staticTypeId = typeIdFromClassName(Planet::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<Planet>(QQmlEngine *qml, QJSEngine *script)
+{
+    qRegisterMetaType<PlanetStyle>();
+    qRegisterMetaTypeStreamOperators<PlanetStyle>();
+    qRegisterMetaType<PlanetStyle::Data>();
+    qRegisterMetaTypeStreamOperators<PlanetStyle::Data>();
+    qmlRegisterType<Planet>("OpenSR.World", 1, 0, "Planet");
+}
+
+template<>
+Planet* WorldObject::createObject(WorldObject *parent, quint32 id)
+{
+    return new Planet(parent, id);
+}
+
+template<>
+quint32 WorldObject::staticTypeId<Planet>()
+{
+    return Planet::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<Planet>()
+{
+    return &Planet::staticMetaObject;
+}
+
+Planet::Planet(WorldObject *parent, quint32 id): SpaceObject(parent, id)
 {
 }
 
-bool Planet::deserialize(std::istream& stream)
+Planet::~Planet()
 {
-    if (!SystemObject::deserialize(stream))
-        return false;
-
-    stream.read((char *)&m_radius, sizeof(float));
-    stream.read((char *)&m_orbit, sizeof(float));
-    stream.read((char *)&m_style, sizeof(uint32_t));
-    stream.read((char *)&m_angle, sizeof(float));
-    stream.read((char *)&m_angleSpeed, sizeof(float));
-
-    return true;
 }
 
-float Planet::orbit() const
+quint32 Planet::typeId() const
 {
-    return m_orbit;
+    return Planet::m_staticTypeId;
 }
 
-float Planet::radius() const
+QString Planet::namePrefix() const
 {
-    return m_radius;
+    return tr("Planet");
 }
 
-float Planet::angle() const
-{
-    return m_angle;
-}
-
-float Planet::angleSpeed() const
-{
-    return m_angleSpeed;
-}
-
-bool Planet::serialize(std::ostream& stream) const
-{
-    if (!SystemObject::serialize(stream))
-        return false;
-
-    stream.write((const char *)&m_radius, sizeof(float));
-    stream.write((const char *)&m_orbit, sizeof(float));
-    stream.write((const char *)&m_style, sizeof(uint32_t));
-    stream.write((const char *)&m_angle, sizeof(float));
-    stream.write((const char *)&m_angleSpeed, sizeof(float));
-
-    return true;
-}
-
-uint32_t Planet::type() const
-{
-    return WorldHelper::TYPE_PLANET;
-}
-
-void Planet::setRadius(float radius)
-{
-    m_radius = radius;
-}
-
-void Planet::setOrbit(float orbit)
-{
-    m_orbit = orbit;
-    updatePosition();
-}
-
-void Planet::setStyle(uint32_t style)
-{
-    m_style = style;
-}
-
-void Planet::setStyle(const std::string& style)
-{
-    m_style = textHash32(style);
-}
-
-void Planet::setAngle(float angle)
-{
-    m_angle = angle;
-    updatePosition();
-}
-
-void Planet::updatePosition()
-{
-    m_position.x = m_orbit * cos(m_angle);
-    m_position.y = m_orbit * sin(m_angle);
-}
-
-void Planet::setAngleSpeed(float speed)
-{
-    m_angleSpeed = speed;
-}
-
-uint32_t Planet::style() const
+PlanetStyle Planet::style() const
 {
     return m_style;
 }
 
-void Planet::calcTurn()
+void Planet::setStyle(const PlanetStyle& style)
 {
-    m_startAngle = m_angle;
+    if (m_style == style)
+        return;
+
+    m_style = style;
+    emit styleChanged(style);
 }
 
-void Planet::finishTurn()
+QString PlanetStyle::surface() const
 {
-    m_angle = m_startAngle + m_angleSpeed;
-    updatePosition();
+    return getData<Data>().surface;
 }
 
-void Planet::turn(float progress)
+void PlanetStyle::setSurface(const QString &texture)
 {
-    m_angle = m_startAngle + m_angleSpeed * progress;
-    updatePosition();
+    auto d = getData<Data>();
+    d.surface = texture;
+    setData(d);
 }
+
+QString PlanetStyle::cloud0() const
+{
+    return getData<Data>().cloud0;
+}
+
+void PlanetStyle::setCloud0(const QString &texture)
+{
+    auto d = getData<Data>();
+    d.cloud0 = texture;
+    setData(d);
+}
+
+QString PlanetStyle::cloud1() const
+{
+    return getData<Data>().cloud1;
+}
+
+void PlanetStyle::setCloud1(const QString &texture)
+{
+    auto d = getData<Data>();
+    d.cloud1 = texture;
+    setData(d);
+}
+
+int PlanetStyle::radius() const
+{
+    return getData<Data>().radius;
+}
+
+void PlanetStyle::setRadius(const int r)
+{
+    auto d = getData<Data>();
+    d.radius = r;
+    setData(d);
+}
+
+QColor PlanetStyle::atmosphere() const
+{
+    return getData<Data>().atmosphere;
+}
+
+void PlanetStyle::setAtmosphere(const QColor& c)
+{
+    auto d = getData<Data>();
+    d.atmosphere = c;
+    setData(d);
+}
+
+bool operator==(const PlanetStyle& one, const PlanetStyle& another)
+{
+    return  (one.surface()  == another.surface() ) &&
+            (one.cloud0() == another.cloud0()) &&
+            (one.cloud1() == another.cloud1()) &&
+            (one.radius() == another.radius()) &&
+            (one.atmosphere() == another.atmosphere())
+            ;
+}
+
+// PlanetStyle Streaming
+QDataStream& operator<<(QDataStream & stream, const PlanetStyle& style)
+{
+    return stream << style.id();
+}
+
+QDataStream& operator>>(QDataStream & stream, PlanetStyle& style)
+{
+    quint32 id;
+    stream >> id;
+    ResourceManager *m = ResourceManager::instance();
+    Q_ASSERT(m != 0);
+    Resource::replaceData(style, m->getResource(id));
+    return stream;
+}
+
+QDataStream& operator<<(QDataStream & stream, const PlanetStyle::Data& data)
+{
+    return stream << data.surface << data.cloud0 << data.cloud1 << data.radius << data.atmosphere;
+}
+
+QDataStream& operator>>(QDataStream & stream, PlanetStyle::Data& data)
+{
+    return stream >> data.surface >> data.cloud0 >> data.cloud1 >> data.radius << data.atmosphere;
+}
+
 }
 }

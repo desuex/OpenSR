@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2012 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,63 +17,87 @@
 */
 
 #include "SpaceObject.h"
-#include "WorldHelper.h"
-#include <map>
 
-namespace Rangers
+#include <QtQml>
+
+namespace OpenSR
 {
 namespace World
 {
-SpaceObject::SpaceObject(uint64_t id): WorldObject(id)
+const quint32 SpaceObject::m_staticTypeId = typeIdFromClassName(SpaceObject::staticMetaObject.className());
+
+template<>
+void WorldObject::registerType<SpaceObject>(QQmlEngine *qml, QJSEngine *script)
 {
-    m_position.x = 0;
-    m_position.y = 0;
+    qmlRegisterType<SpaceObject>("OpenSR.World", 1, 0, "SpaceObject");
 }
 
-bool SpaceObject::deserialize(std::istream& stream)
+template<>
+SpaceObject* WorldObject::createObject(WorldObject *parent, quint32 id)
 {
-    if (!WorldObject::deserialize(stream))
-        return false;
-
-    stream.read((char *)&m_position, sizeof(Point));
-
-    if (!stream.good())
-        return false;
-
-    return true;
+    return new SpaceObject(parent, id);
 }
 
-Point SpaceObject::position() const
+template<>
+quint32 WorldObject::staticTypeId<SpaceObject>()
+{
+    return SpaceObject::m_staticTypeId;
+}
+
+template<>
+const QMetaObject* WorldObject::staticTypeMeta<SpaceObject>()
+{
+    return &SpaceObject::staticMetaObject;
+}
+
+SpaceObject::SpaceObject(WorldObject *parent, quint32 id): WorldObject(parent, id)
+{
+}
+
+SpaceObject::~SpaceObject()
+{
+}
+
+QPointF SpaceObject::position() const
 {
     return m_position;
 }
 
-bool SpaceObject::serialize(std::ostream& stream) const
+void SpaceObject::setPosition(const QPointF& pos)
 {
-    if (!WorldObject::serialize(stream))
-        return false;
-
-    stream.write((const char *)&m_position, sizeof(Point));
-
-    if (!stream.good())
-        return false;
-
-    return true;
+    if (pos != m_position)
+    {
+        m_position = pos;
+        emit(positionChanged());
+    }
 }
 
-uint32_t SpaceObject::type() const
+quint32 SpaceObject::typeId() const
 {
-    return WorldHelper::TYPE_SPACEOBJECT;
+    return SpaceObject::m_staticTypeId;
 }
 
-void SpaceObject::setPosition(const Point& point)
+QString SpaceObject::namePrefix() const
 {
-    m_position = point;
+    return tr("Space object");
 }
 
-Trajectory SpaceObject::trajectory() const
+QVariantList SpaceObject::trajectory() const
 {
-    return m_trajectory;
+    QVariantList result;
+    for (auto curve : m_trajectory)
+        result.append(QVariant::fromValue(curve));
+    return result;
+}
+
+void SpaceObject::setTrajectory(const QList<BezierCurve>& trajectory)
+{
+    m_trajectory = trajectory;
+    emit(trajectoryChanged());
+}
+
+void SpaceObject::updateTrajectory()
+{
 }
 }
 }

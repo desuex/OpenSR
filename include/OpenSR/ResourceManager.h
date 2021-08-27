@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 - 2014 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2015 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,79 +16,79 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef RANGERS_RESOURCEMANAGER_H
-#define RANGERS_RESOURCEMANAGER_H
+#ifndef OPENSR_RESOURCEMANAGER_H
+#define OPENSR_RESOURCEMANAGER_H
 
-#include "OpenSR/config.h"
-#include "OpenSR/ResourceAdapter.h"
-#include "OpenSR/ResourceObjectManager.h"
+#include <OpenSR/OpenSR.h>
+#include <QObject>
+#include <QHash>
+#include <QSharedPointer>
 
-#include <map>
-#include <list>
-#include <boost/shared_ptr.hpp>
-#include <boost/shared_array.hpp>
+class QQmlNetworkAccessManagerFactory;
+class QIODevice;
 
-struct SDL_RWops;
-namespace Rangers
+namespace OpenSR
 {
-class Texture;
-class AnimatedTexture;
-class Font;
-class Sprite;
-class AnimatedSprite;
-class Object;
-struct GAIAnimation;
-class LuaWidget;
-class Widget;
-struct DATRecord;
+class ResourceManagerNAMFactory;
+class ResourceNode;
 
-class RANGERS_ENGINE_API ResourceManager
+class ResourceProvider
 {
 public:
-    void addRPKG(const std::string& path);
-    void addDir(const std::string& path);
+    virtual ~ResourceProvider();
 
-    boost::shared_array<char> loadData(const std::string& name, size_t &size);
-    boost::shared_ptr<std::istream> getFileStream(const std::string& name);
-    SDL_RWops* getSDLRW(const std::string& name);
+    virtual void load(ResourceNode& root) = 0;
+    virtual QIODevice *getDevice(const ResourceNode& node, QObject *parent = 0) = 0;
+};
 
-    boost::shared_ptr<Texture> loadTexture(const std::string& name);
-    boost::shared_ptr<AnimatedTexture> loadAnimation(const std::string& name, bool backgroundLoading = false);
+class ResourceInfo
+{
+public:
+    ResourceInfo();
+    virtual ~ResourceInfo();
 
-    boost::shared_ptr<Font> loadFont(const FontDescriptor& desc);
-    boost::shared_ptr<Font> loadFont(const std::string& name, int size, bool antialiased = true);
+    ResourceProvider *provider;
+};
 
-    void addDATFile(const std::string& name, bool isCache = false);
-    boost::shared_ptr<DATRecord> datRoot();
-    std::string datValue(const std::string& path) const;
+class ResourceNode
+{
+public:
+    enum Type {FILE, DIRECTORY};
 
-    bool resourceExists(const std::string& path);
+    ResourceNode(const QString& name = QString(), Type type = ResourceNode::DIRECTORY,
+                 ResourceNode *parent = 0, QSharedPointer<ResourceInfo> info = QSharedPointer<ResourceInfo>());
+    virtual ~ResourceNode();
 
-    ResourceObjectManager& objectManager();
+    ResourceNode *parent;
+    Type type;
+    QString name;
+    QHash<QString, ResourceNode> children;
+    QSharedPointer<ResourceInfo> info;
+};
 
-    static ResourceManager& instance();
+class ENGINE_API ResourceManager : public QObject
+{
+    Q_OBJECT
+public:
+    ResourceManager(QObject *parent = 0);
+    virtual ~ResourceManager();
 
-    void processMain();
+    QQmlNetworkAccessManagerFactory *qmlNAMFactory() const;
+
+    bool fileExists(const QString& path) const;
+    QIODevice *getIODevice(const QString& path, QObject *parent = 0);
+    QIODevice *getIODevice(const QUrl& path, QObject *parent = 0);
+
+public Q_SLOTS:
+    void addFileSystemPath(const QString& path);
+    void addPKGArchive(const QString& path);
+    void addProvider(ResourceProvider* provider);
 
 private:
-    ResourceManager();
-    ResourceManager(const ResourceManager& other);
-
-    class GAIWorker;
-    void processGAIQueue();
-    void cleanupUnused();
-
-    std::map<std::string, boost::shared_ptr<ResourceAdapter> > m_files;
-    std::list<boost::shared_ptr<ResourceAdapter> > m_adapters;
-
-    std::map<std::string, boost::shared_ptr<Texture> > m_textures;
-    std::map<std::string, boost::shared_ptr<AnimatedTexture> > m_animations;
-    std::map<std::string, boost::shared_ptr<Font> > m_fonts;
-    std::map<boost::shared_ptr<AnimatedTexture>, GAIWorker *> m_gaiQueue;
-    boost::shared_ptr<DATRecord> m_datRoot;
-
-    ResourceObjectManager m_objectManager;
+    ResourceNode m_root;
+    ResourceManagerNAMFactory *m_namFactory;
+    QList<ResourceProvider*> m_dataProviders;
 };
 }
 
-#endif // RESOURCEMANAGER_H
+#endif // OPENSR_RESOURCEMANAGER_H

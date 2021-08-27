@@ -1,6 +1,6 @@
 /*
     OpenSR - opensource multi-genre game based upon "Space Rangers 2: Dominators"
-    Copyright (C) 2011 Kosyak <ObKo@mail.ru>
+    Copyright (C) 2014 - 2017 Kosyak <ObKo@mail.ru>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,24 +16,25 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-//#include <SDL.h>
-#include "OpenSR/Engine.h"
+#include <OpenSR/Engine.h>
 
-using namespace Rangers;
-using namespace std;
+namespace
+{
+static const QString SETTINGS_ORGANIZATION = "OpenSR";
+static const QString SETTINGS_APPLICATION = "OpenSR";
+static const QString STARTUP_SCRIPT = "res:/opensr.js";
+static const QString MAIN_QML = "res:/OpenSR/GameWindow.qml";
+}
 
 int main(int argc, char **argv)
 {
-    Engine &engine = Engine::instance();
-    engine.init(argc, argv, 1024, 768, false);
+    OpenSR::Engine engine(argc, argv);
+
+    QApplication::setOrganizationName(SETTINGS_ORGANIZATION);
+    QApplication::setApplicationName(SETTINGS_APPLICATION);
+
+    engine.setStartupScript(STARTUP_SCRIPT);
+    engine.setMainQML(MAIN_QML);
+
     return engine.run();
 }
-
-#ifdef WIN32
-//TODO: Arguments in WinMain
-int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-{
-    return main(0, 0);
-}
-#endif
-

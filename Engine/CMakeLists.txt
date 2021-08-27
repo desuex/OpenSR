@@ -1,108 +1,77 @@
+FIND_PACKAGE(Qt5Widgets REQUIRED)
+FIND_PACKAGE(Qt5Quick REQUIRED)
+FIND_PACKAGE(OpenAL REQUIRED)
+
 SET(SOURCES
     Engine.cpp
-    Node.cpp
-    Object.cpp
-    Sprite.cpp
-    Types.cpp
-    Texture.cpp
-    Label.cpp
-    LabelWidget.cpp
-    Font.cpp
-    FTFont.cpp
-    AnimatedTexture.cpp
-    AnimatedSprite.cpp
-    Widget.cpp
-    Utils.cpp
-    ConsoleWidget.cpp
-    LineEdit.cpp
-    Log.cpp
-    ColorLabel.cpp
-    ResourceAdapter.cpp
-    RPKGAdapter.cpp
-    ResourceManager.cpp 
-    FSAdapter.cpp
-    GAISprite.cpp
-    Button.cpp
-    Action.cpp
-    WidgetNode.cpp
-    CheckBox.cpp
-    NinePatch.cpp
-    ScrollArea.cpp
-    Styles.cpp
     SoundManager.cpp
     Sound.cpp
-    Plugin.cpp
-    Shader.cpp
-    ShaderProgram.cpp
-    SpriteWidget.cpp
-    PythonBindings.cpp
-    ScriptWidget.cpp
-    RadioButton.cpp
-    RadioButtonGroup.cpp
-    TiledLine.cpp
-    TiledPolyline.cpp
-    TiledBezierCurve.cpp
-    ResourceObjectManager.cpp
-    AFTFont.cpp
+    GAIAnimatedImage.cpp
+    GAITexture.cpp
+    ResourceManager.cpp
+    QMLQuestPlayer.cpp
+    Music.cpp
+    MPG123MusicDecoder.cpp
+    VorbisMusicDecoder.cpp
+    TexturedPolyline.cpp
+    TexturedBezierCurve.cpp
+    Types.cpp
+    QMLHelper.cpp
+    DATTranslator.cpp
+    SpaceMouseArea.cpp
+    PlanetDrawer.cpp
+)
+
+SET(HEADERS 
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/Engine.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/SoundManager.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/Sound.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/GAIAnimatedImage.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/GAITexture.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/ResourceManager.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/QMLQuestPlayer.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/Music.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/MusicDecoder.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/TexturedPolyline.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/TexturedBezierCurve.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/Types.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/QMLHelper.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/PlanetDrawer.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/DATTranslator.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/SpaceMouseArea.h
+    ${CMAKE_SOURCE_DIR}/include/OpenSR/PlanetDrawer.h
+)
+
+SET(PRIVATE_HEADERS 
+    ResourceManager_p.h
+    SoundManager_p.h
+    MPG123MusicDecoder.h
+    VorbisMusicDecoder.h
 )
 
 INCLUDE_DIRECTORIES(
-    ${SDL2_INCLUDE_DIR}
     ${OPENGL_INCLUDE_DIR}
-    ${BOOST_INCLUDE_DIRS}
-    ${FREETYPE_INCLUDE_DIRS}
-    ${ICONV_INCLUDE_DIR}
-    ${JSONCPP_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${SDL2_MIXER_INCLUDE_DIR}
-    ${LIBINTL_INCLUDE_DIR}
-    ${PYTHON_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/include/
-    ${CMAKE_BINARY_DIR}/include/
-    ${CMAKE_SOURCE_DIR}/libRanger
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_BINARY_DIR}/include
+    ${Qt5Gui_INCLUDE_DIRS}
+    ${Qt5Widgets_INCLUDE_DIRS}
+    ${Qt5Core_INCLUDE_DIRS}
+    ${Qt5Quick_INCLUDE_DIRS}
+    ${OPENAL_INCLUDE_DIR}
 )
+
+QT5_WRAP_CPP(MOC_SOURCES ${HEADERS} ${PRIVATE_HEADERS})
+QT5_ADD_RESOURCES(QRC_QML_SOURCES ${CMAKE_SOURCE_DIR}/QML/qml.qrc)
+
+ADD_LIBRARY(engine SHARED ${SOURCES} ${MOC_SOURCES})
+TARGET_LINK_LIBRARIES(engine RangerQt QM Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Quick ${OPENAL_LIBRARY})
+SET_TARGET_PROPERTIES(engine PROPERTIES COMPILE_DEFINITIONS "OPENSR_ENGINE_BUILD")
 
 IF(WIN32)
-  INCLUDE_DIRECTORIES(${GLEW_INCLUDE_DIR})
-ENDIF(WIN32)
+    SET_TARGET_PROPERTIES(engine PROPERTIES PREFIX "")
+ENDIF()
 
-ADD_LIBRARY(engine SHARED ${SOURCES})
-SET_TARGET_PROPERTIES(engine PROPERTIES VERSION "${MAJOR_VERSION}.${MINOR_VERSION}" COMPILE_FLAGS "-DRANGERS_ENGINE_BUILD")
-TARGET_LINK_LIBRARIES(engine ranger ${CMAKE_THREAD_LIBS_INIT})
-
-IF(WIN32)
-TARGET_LINK_LIBRARIES(engine 
-    ${SDL2_LIBRARY} 
-    ${OPENGL_LIBRARIES} 
-    ${FREETYPE_LIBRARIES}
-    ${Boost_THREAD_LIBRARY} 
-    ${Boost_SYSTEM_LIBRARY}
-    ${Boost_PYTHON3_LIBRARY}
-    ${JSONCPP_LIBRARIES}
-    ${SDL2_MIXER_LIBRARY}
-    ${LIBINTL_LIBRARIES}
-    ${PYTHON_LIBRARIES}
-    ${GLEW_LIBRARIES}
-)
-ELSE(WIN32)
-TARGET_LINK_LIBRARIES(engine
-    ${SDL2_LIBRARY} 
-    ${OPENGL_LIBRARIES} 
-    ${FREETYPE_LIBRARIES}
-    ${Boost_THREAD_LIBRARY} 
-    ${Boost_SYSTEM_LIBRARY} 
-    ${Boost_PYTHON3_LIBRARY}
-    ${JSONCPP_LIBRARIES}
-    ${SDL2_MIXER_LIBRARY}
-    ${LIBINTL_LIBRARIES}
-    ${PYTHON_LIBRARIES}
-    dl
-)
-ENDIF(WIN32)
-
-ADD_EXECUTABLE(opensr main.cpp)
-TARGET_LINK_LIBRARIES(opensr engine ranger)
+ADD_EXECUTABLE(opensr main.cpp ${QRC_QML_SOURCES})
+TARGET_LINK_LIBRARIES(opensr engine)
 
 INSTALL(TARGETS opensr RUNTIME DESTINATION bin)
-INSTALL(TARGETS engine LIBRARY DESTINATION lib ARCHIVE DESTINATION lib RUNTIME DESTINATION bin)
